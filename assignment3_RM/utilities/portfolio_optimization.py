@@ -18,8 +18,8 @@ from utilities.covariance_utilities import (
 def minimum_variance_portfolio(cov_matrix: np.ndarray) -> np.ndarray:
     """
     Calculate the minimum variance portfolio weights given a covariance matrix.
-    In particular the weights are given by:
-    w = (Σ * 1) / (1^T * Σ * 1), i.e. the solution of the optimization problem:
+    In particular the weights are given by: (pay attention: the following formula has to be written with the invese ov matrix)
+    w = (Σ * 1) / (1^T * Σ * 1), i.e. the solution of the optimization problem: 
     min_w w^T * Σ * w, subject to 1^T * w = 1.
 
     Parameters:
@@ -40,8 +40,8 @@ def minimum_variance_portfolio(cov_matrix: np.ndarray) -> np.ndarray:
     n = cov_matrix.shape[0]
     ones_vec = np.ones((n, 1))
 
-    min_var_ptf_numerator = None  # !!! COMPLETE AS APPROPRIATE !!!
-    min_var_ptf_weights = None  # !!! COMPLETE AS APPROPRIATE !!!
+    min_var_ptf_numerator = np.linalg.inv(cov_matrix) @ ones_vec
+    min_var_ptf_weights = min_var_ptf_numerator / (ones_vec.T @ np.linalg.inv(cov_matrix) @ ones_vec)
 
     return min_var_ptf_weights.flatten()
 
@@ -100,7 +100,53 @@ def mean_variance_portfolio(
         raise ValueError(
             f"risk_aversion must be strictly positive, got {risk_aversion}"
         )
+    n = cov_matrix.shape[0]
+    ones_vec = np.ones(n)
 
-    mean_var_ptf_weights = None  # !!! COMPLETE AS APPROPRIATE !!!
+    # Σ⁻¹μ e Σ⁻¹1
+    inv_cov_mu = np.linalg.solve(cov_matrix, expected_returns)
+    inv_cov_ones = np.linalg.solve(cov_matrix, ones_vec)
 
+    A = ones_vec @ inv_cov_mu      # 1ᵀ Σ⁻¹ μ
+    C = ones_vec @ inv_cov_ones    # 1ᵀ Σ⁻¹ 1
+
+    # a* = (A/γ) · (Σ⁻¹μ / A) + (1 - A/γ) · (Σ⁻¹1 / C)
+    mean_var_ptf_weights = (A / risk_aversion) * (inv_cov_mu / A) + (1 - A / risk_aversion) * (inv_cov_ones / C)
     return mean_var_ptf_weights.flatten()
+
+# add a bisection funciotn in order to get to the right gamma
+def bisection(f, a, b, tol=1e-6, max_iter=100):
+    """
+    Finds a root of the function f in the interval [a, b] using the bisection method.
+    
+    Parameters:
+    f (callable): The function for which to find the root.
+    a (float): Left endpoint of the interval.
+    b (float): Right endpoint of the interval.
+    tol (float): Tolerance for the stopping criterion (interval width).
+    max_iter (int): Maximum number of allowed iterations.
+    
+    Returns:
+    float: An approximation of the root.
+    """
+    # Initial check: f(a) and f(b) must have opposite signs
+    if f(a) * f(b) >= 0:
+        raise ValueError("The function must have opposite signs at the endpoints of the interval [a, b].")
+    
+    for i in range(max_iter):
+        # Calculate the midpoint
+        c = (a + b) / 2.0
+        
+        # Stopping criterion: 
+        # Exact root found or the interval has become smaller than the tolerance
+        if f(c) == 0 or (b - a) / 2.0 < tol:
+            return c
+        
+        # Narrow down the interval for the next iteration
+        if f(a) * f(c) < 0:
+            b = c  # The root is between 'a' and 'c'
+        else:
+            a = c  # The root is between 'c' and 'b'
+            
+    print("Warning: maximum number of iterations reached without satisfying the tolerance.")
+    return (a + b) / 2.0
