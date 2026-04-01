@@ -217,7 +217,7 @@ def market_factor_shrinkage(
     if denominator == 0:
         intensity = 0.0
     else:
-        intensity = max(0.0, min(1.0, numerator /  denominator))
+        intensity = max(0.0, min(1.0, numerator / (T* denominator)))
 
     return {
         "target": target,
