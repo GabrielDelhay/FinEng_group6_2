@@ -25,7 +25,7 @@ def _align_portfolios_and_returns(
     aligned_portfolios = (
         portfolios.loc[:, overlapping_assets]
         .reindex(returns.index)
-        .bfill()
+        .ffill()     # MISTAKE: carry forward the most recent portfolio until the next rebalance date
         .shift()
         .dropna(axis=0, how="all")
     )
