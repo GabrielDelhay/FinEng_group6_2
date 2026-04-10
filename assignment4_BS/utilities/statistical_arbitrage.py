@@ -109,21 +109,22 @@ def estimate_factor_model(
         raise ValueError(f"n_factors must be at least 1, got {n_factors}")
 
     # Compute correlation matrix
-    cov_matrix = returns.cov().values
+    cov_matrix = returns.corr().values
 
     # Eigendecomposition
-    eigenvalues, eigenvectors = None  # !!! COMPLETE AS APPROPRIATE !!!
+    eigenvalues, eigenvectors = principal_component_analysis(cov_matrix)
 
     # Select top n_factors
-    eigenvalues_selected = None  # !!! COMPLETE AS APPROPRIATE !!!
-    eigenvectors_selected = None  # !!! COMPLETE AS APPROPRIATE !!!
+    eigenvalues_selected = eigenvalues[:n_factors]  
+    eigenvectors_selected = eigenvectors[:, :n_factors] 
 
     # Factor returns
-    factors = None  # !!! COMPLETE AS APPROPRIATE !!!
+    factors = (returns / returns.std()) @ eigenvectors_selected
+    
+    #MISTAKE: FACTORS WASN'T PROCESSED AS NP.ARRAY AND WAS GENERATING ONLY NaN
     factors_df = pd.DataFrame(
-        factors, index=returns.index, columns=[f"PC{i + 1}" for i in range(n_factors)]
+        np.array(factors), index=returns.index, columns=[f"PC{i + 1}" for i in range(n_factors)]
     )
-
     # For each asset, regress returns on factors to get betas and alpha
     residuals_df, betas_df, alphas_series = estimate_ou_window_residuals(
         returns,
@@ -131,7 +132,7 @@ def estimate_factor_model(
     ).values()
 
     # Explained variance ratio
-    explained_variance = None  # !!! COMPLETE AS APPROPRIATE !!!
+    explained_variance = eigenvalues_selected / eigenvalues.sum()
 
     return {
         "eigenvalues": eigenvalues,
@@ -166,13 +167,35 @@ def estimate_ou_window_residuals(
     factors_ou = factors.iloc[-ou_window:]
     T_ou, N = returns_ou.shape
     n_factors = factors_ou.shape[1]
-
     betas = np.zeros((N, n_factors))
     alphas = np.zeros(N)
     residuals = np.zeros((T_ou, N))
 
-    # !!! COMPLETE AS APPROPRIATE !!!
+    # Add intercept column natively in pandas
+    X_df = factors_ou.copy()
+    X_df.insert(0, 'alpha', 1.0)
+    
+    # Convert to numpy array for OLS
+    X_aug = X_df.values
+    #display(X_aug)
+    Y = returns_ou.values
 
+    # Vectorized OLS regression using NumPy
+    # B contains alpha in the first row, betas in the remaining rows
+    B, residuals_by_function, _, _ = np.linalg.lstsq(X_aug, Y, rcond=None)
+
+    # Extract alphas and betas
+    alphas = B[0, :]
+    betas = B[1:, :].T
+
+    # Compute daily residuals
+    daily_residuals = Y - X_aug @ B
+
+    prova = residuals_by_function - daily_residuals
+    display(prova)
+
+    # Compute cumulative residuals
+    residuals = np.cumsum(daily_residuals, axis=0)
     residuals_df = pd.DataFrame(
         residuals, index=returns_ou.index, columns=returns_ou.columns
     )
