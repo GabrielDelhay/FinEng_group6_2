@@ -292,8 +292,12 @@ def estimate_all_ou_parameters(
 
     # Center O-U equilibrium means by subtracting the cross-sectional average
     if center_ou_means:
-        pass  # !!! COMPLETE AS APPROPRIATE !!!
-
+        all_m = [p['m'] for p in ou_params.values()]
+        avg_m = np.mean(all_m)
+        
+        for asset in ou_params:
+            ou_params[asset]['m'] -= avg_m
+            
     return ou_params
 
 
