@@ -120,7 +120,7 @@ def estimate_factor_model(
 
     # Factor returns
     factors = (returns / returns.std()) @ eigenvectors_selected
-    
+
     #MISTAKE: FACTORS WASN'T PROCESSED AS NP.ARRAY AND WAS GENERATING ONLY NaN
     factors_df = pd.DataFrame(
         np.array(factors), index=returns.index, columns=[f"PC{i + 1}" for i in range(n_factors)]
@@ -192,7 +192,6 @@ def estimate_ou_window_residuals(
     daily_residuals = Y - X_aug @ B
 
     prova = residuals_by_function - daily_residuals
-    display(prova)
 
     # Compute cumulative residuals
     residuals = np.cumsum(daily_residuals, axis=0)
@@ -237,20 +236,25 @@ def estimate_ou_parameters(
     X = residuals.values
     T = len(X)
 
-    a = None  # !!! COMPLETE AS APPROPRIATE !!!
-    b = None  # !!! COMPLETE AS APPROPRIATE !!!
-    epsilon = None  # !!! COMPLETE AS APPROPRIATE !!!
-    var_epsilon = None  # !!! COMPLETE AS APPROPRIATE !!!
+    # AR(1) data preparation
+    X_t = X[:-1]
+    X_t_plus_1 = X[1:]
 
-    kappa = None  # !!! COMPLETE AS APPROPRIATE !!!
-    m = None  # !!! COMPLETE AS APPROPRIATE !!!
-    sigma = None  # !!! COMPLETE AS APPROPRIATE !!!
+    # OLS Regression: X_{t+1} = a + b * X_t
+    # np.polyfit returns [slope (b), intercept (a)]
+    b, a = np.polyfit(X_t, X_t_plus_1, 1)
+    
+    epsilon = X_t_plus_1 - a - b * X_t
+    var_epsilon = np.var(epsilon)
 
-    # Equilibrium standard deviation
-    sigma_eq = None  # !!! COMPLETE AS APPROPRIATE !!!
+    # Recover O-U parameters
+    kappa = -np.log(b) / dt
+    m = a / (1 - b)
+    sigma_eq = np.sqrt(var_epsilon / (1 - b**2))
+    sigma = sigma_eq * np.sqrt(2 * kappa)
 
     # Half-life of mean reversion
-    half_life = None  # !!! COMPLETE AS APPROPRIATE !!!
+    half_life = np.log(2) / kappa
 
     return {
         "kappa": kappa,
