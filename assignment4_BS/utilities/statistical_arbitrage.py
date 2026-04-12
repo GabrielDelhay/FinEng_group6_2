@@ -119,11 +119,10 @@ def estimate_factor_model(
     eigenvectors_selected = eigenvectors[:, :n_factors] 
 
     # Factor returns
-    factors = (returns / returns.std()) @ eigenvectors_selected
+    factors = np.array((returns / returns.std()) @ eigenvectors_selected)
 
-    #MISTAKE: FACTORS WASN'T PROCESSED AS NP.ARRAY AND WAS GENERATING ONLY NaN
     factors_df = pd.DataFrame(
-        np.array(factors), index=returns.index, columns=[f"PC{i + 1}" for i in range(n_factors)]
+        factors, index=returns.index, columns=[f"PC{i + 1}" for i in range(n_factors)]
     )
     # For each asset, regress returns on factors to get betas and alpha
     residuals_df, betas_df, alphas_series = estimate_ou_window_residuals(
@@ -327,7 +326,22 @@ def compute_s_score(
         dtype=float,
     )
 
-    # !!! COMPLETE AS APPROPRIATE !!!
+    for asset in cumulative_residuals.columns:
+        params = ou_params[asset]
+
+        kappa = params["kappa"]
+        m     = params["m"]      
+        sigma_eq = params["sigma_eq"]
+
+        # s-score de base
+        s = (cumulative_residuals[asset] - m) / sigma_eq
+
+        if modified:
+            # correction for residual drift
+            alpha = params["alpha"]
+            s = s - alpha / (kappa * sigma_eq)
+
+        s_scores[asset] = s
 
     return s_scores
 
