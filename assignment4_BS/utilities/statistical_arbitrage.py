@@ -249,8 +249,11 @@ def estimate_ou_parameters(
     # Recover O-U parameters
     kappa = -np.log(b) / dt
     m = a / (1 - b)
-    sigma_eq = np.sqrt(var_epsilon / (1 - b**2))
-    sigma = sigma_eq * np.sqrt(2 * kappa)
+    denom = 1 - b**2
+    sigma = np.sqrt(var_epsilon * 2 * kappa / denom) if denom > 0 else np.nan
+
+    # Equilibrium standard deviation
+    sigma_eq = np.sqrt(var_epsilon / denom) if denom > 0 else np.nan
 
     # Half-life of mean reversion
     half_life = np.log(2) / kappa
@@ -304,6 +307,7 @@ def compute_s_score(
     cumulative_residuals: pd.DataFrame,
     ou_params: dict[str, dict[str, float]],
     modified: bool = False,
+    alphas: pd.Series | None = None, # We need alphas to compute the modified s-score, but we can also compute the basic s-score without them
 ) -> pd.DataFrame:
     """Compute the s-score for each asset based on its deviation from equilibrium.
 
@@ -337,8 +341,10 @@ def compute_s_score(
         s = (cumulative_residuals[asset] - m) / sigma_eq
 
         if modified:
+            if alphas is None:
+                raise ValueError("alphas must be provided to compute modified s-score")
             # correction for residual drift
-            alpha = params["alpha"]
+            alpha = alphas[asset]
             s = s - alpha / (kappa * sigma_eq)
 
         s_scores[asset] = s
@@ -381,8 +387,25 @@ def update_positions(
         s = cur_s_scores[asset]
         prev = current_positions.get(asset, 0.0)
 
-        ### !!! COMPLETE AS APPROPRIATE !!!
-
+        if asset not in valid_assets:
+            new_positions[asset] = 0.0  # Force close if not valid
+        elif prev == 0.0:
+            if s < -s_bo:
+                new_positions[asset] = 1.0  # Buy to open
+            elif s > s_so:
+                new_positions[asset] = -1.0  # Sell to open
+            else:
+                new_positions[asset] = 0.0  # Stay flat
+        elif prev == 1.0:
+            if s > -s_bc:
+                new_positions[asset] = 0.0  # Close long
+            else:
+                new_positions[asset] = 1.0  # Stay long
+        elif prev == -1.0:
+            if s < s_sc:
+                new_positions[asset] = 0.0  # Close short
+            else:
+                new_positions[asset] = -1.0  # Stay short       
     return new_positions
 
 
@@ -399,7 +422,9 @@ def compute_portfolio_weights(
     """
     weights = positions.copy()
 
-    # !!! COMPLETE AS APPROPRIATE !!!
+    # Normalize weights to ensure total absolute weight sums to 1
+    abs_sum = weights.abs().sum(axis=1)
+    weights = weights.div(abs_sum, axis=0).fillna(0.0)
 
     return weights
 
