@@ -65,7 +65,8 @@ def portfolio_returns(
     gross_returns = aligned_portfolios.multiply(aligned_returns).sum(axis=1)
 
     if transaction_costs != 0.0:
-        pass  # !!! COMPLETE AS APPROPRIATE !!!
+        turnover = aligned_portfolios.diff().abs().sum(axis=1).fillna(0.0)
+        gross_returns -= turnover * transaction_costs    # !!! COMPLETE AS APPROPRIATE !!!
 
     return gross_returns
 
