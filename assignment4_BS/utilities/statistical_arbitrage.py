@@ -344,8 +344,8 @@ def compute_s_score(
             if alphas is None:
                 raise ValueError("alphas must be provided to compute modified s-score")
             # correction for residual drift
-            alpha = alphas[asset]
-            s = s - alpha / (kappa * sigma_eq)
+            alpha_annual = alphas[asset] * 252   # daily → annual
+            s = s - alpha_annual / (kappa * sigma_eq)
 
         s_scores[asset] = s
 
