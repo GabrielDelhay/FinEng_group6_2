@@ -68,6 +68,7 @@ def portfolio_returns(
         turnover = aligned_portfolios.diff().abs().sum(axis=1).fillna(0.0)
         gross_returns -= turnover * transaction_costs  
 
+
     return gross_returns
 
 
