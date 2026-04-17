@@ -46,7 +46,7 @@ def compute_volume_adjusted_returns(
     ret = returns.loc[common_idx, common_cols]
 
     # Trailing average volume
-    avg_volume = vol.rolling(window=trailing_window).mean()  
+    avg_volume = vol.shift(1).rolling(window=trailing_window).mean()  
 
     # Volume adjustment ratio: <δV> / V_t
     # Clip volume to avoid division by zero or extreme ratios
