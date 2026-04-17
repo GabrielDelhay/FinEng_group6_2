@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from utilities.principal_component_analysis import principal_component_analysis
 
-'''
+
 def compute_volume_adjusted_returns(
     returns: pd.DataFrame,
     volume: pd.DataFrame,
@@ -46,7 +46,7 @@ def compute_volume_adjusted_returns(
     ret = returns.loc[common_idx, common_cols]
 
     # Trailing average volume
-    avg_volume = vol.shift(1).rolling(window=trailing_window).mean()  # shift(1) to avoid look-ahead bias
+    avg_volume = vol.rolling(window=trailing_window).mean()  
 
     # Volume adjustment ratio: <δV> / V_t
     # Clip volume to avoid division by zero or extreme ratios
@@ -58,26 +58,6 @@ def compute_volume_adjusted_returns(
 
     return ret * adjustment
 
-'''
-    
-
-def compute_volume_adjusted_returns(
-      returns: pd.DataFrame,
-      volume: pd.DataFrame,          # deve coprire ≥ trailing_window gg PRIMA di returns.index[0]
-      trailing_window: int = 10,
-  ) -> pd.DataFrame:
-      cols = returns.columns.intersection(volume.columns)
-      vol = volume[cols].sort_index()
-      ret = returns[cols].sort_index()
-
-      avg_volume = vol.shift(1).rolling(window=trailing_window, min_periods=trailing_window).mean()
-
-      # Riallineo SOLO ora all'indice dei returns (la media usa la pre-history)
-      avg_volume = avg_volume.reindex(ret.index)
-      vol_aligned = vol.reindex(ret.index)
-
-      vol_safe = vol_aligned.where(vol_aligned > 0)
-      return ret * (avg_volume / vol_safe)
 
 def estimate_factor_model(
     returns: pd.DataFrame,
@@ -139,7 +119,7 @@ def estimate_factor_model(
     eigenvectors_selected = eigenvectors[:, :n_factors] 
 
     # Factor returns
-    factors = np.array((returns / returns.std(ddof=1)) @ eigenvectors_selected) # MISTAKE: std deviation ah argomento uguale a uno così è unbiased
+    factors = np.array((returns / returns.std()) @ eigenvectors_selected)
 
     factors_df = pd.DataFrame(
         factors, index=returns.index, columns=[f"PC{i + 1}" for i in range(n_factors)]
