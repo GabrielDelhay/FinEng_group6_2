@@ -26,7 +26,6 @@ r = interp1(dates, zeroRates, maturity);
 B = exp(-r * T);
 F0 = S0 * exp((r - q) * T);      % ATM forward
 x_vec = [-0.05223, 0, 0.15];     % x = log(F/K)
-K_vec = F0 * exp(-x_vec);
 
 fprintf('S0=%.4f  F0=%.4f  B=%.6f  r=%.4f  q=%.4f  T=%.1f\n\n',S0, F0, B, r, q, T);
 
@@ -44,14 +43,13 @@ C_residuals = zeros(1,3);
 
 for j = 1:3
     x = x_vec(j);
-    K = K_vec(j);
 
     % Quadrature method
     Integrand = @(u) real(lewisIntegrand(u,x,p_plus,p_minus,mu));
-    I_q      = quadgk(Integrand, -Inf, Inf)
+    I_q      = quadgk(Integrand, -Inf, Inf);
     C_quad(j) = B * F0 * (1 - exp(-x/2) / (2*pi) * I_q);
     % Residuals method
-    I_r = integralLewis_Residuals(x,p_plus,p_minus,mu)
+    I_r = integralLewis_Residuals(x,p_plus,p_minus,mu);
     C_residuals(j) = B * F0 * (1 - exp(-x/2) / (2*pi) * I_r);
     % Monte Carlo
     C_mc = priceMC(x_vec, F0, B, p_plus, p_minus, mu, 1e6);
@@ -59,11 +57,11 @@ for j = 1:3
     [x_grid, C_fft] = compute_FFT(p_plus, p_minus, mu);
     x_targets = [-0.05223, 0, 0.15];
     C_interp = interp1(x_grid, C_fft, x_targets, 'spline');
-    C_price = B * F0 * (1 - exp(-x_targets/2) ./ (2*pi) .* C_interp);
+    C_fft = B * F0 * (1 - exp(-x_targets/2) ./ (2*pi) .* C_interp);
 end
 
 %% results
 fprintf('Quadrature:  %.4f  %.4f  %.4f\n', C_quad);
 fprintf('Residuals:  %.4f  %.4f  %.4f\n', C_residuals);
 fprintf('MonteCarlo:  %.4f  %.4f  %.4f\n', C_mc);
-fprintf('FFT:  %.4f  %.4f  %.4f\n', C_price);
+fprintf('FFT:  %.4f  %.4f  %.4f\n', C_fft);
