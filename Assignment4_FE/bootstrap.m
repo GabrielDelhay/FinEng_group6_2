@@ -40,7 +40,6 @@ for i = 1:nDepos
         break   % we stop when there is an overlap with futures (more liquid)
     end
 end
-disp(discounts)
 
 %% STIR FUTURES
 %  B(t0, T_i) = B(t0, T_{i-1}) * 1 / (1 + r_fwd * 0.25)
