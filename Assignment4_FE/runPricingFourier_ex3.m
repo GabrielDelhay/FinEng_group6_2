@@ -46,7 +46,7 @@ for j = 1:3
 
     % Quadrature method
     Integrand = @(u) real(lewisIntegrand(u,x,p_plus,p_minus,mu));
-    I_q      = quadgk(Integrand, -Inf, Inf);
+    I_q      = 2 * quadgk(Integrand, 0, Inf);
     C_quad(j) = B * F0 * (1 - exp(-x/2) / (2*pi) * I_q);
     % Residuals method
     I_r = integralLewis_Residuals(x,p_plus,p_minus,mu);
