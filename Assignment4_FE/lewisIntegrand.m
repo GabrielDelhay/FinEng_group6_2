@@ -8,7 +8,7 @@ function g = lewisIntegrand(u, x, p_plus, p_minus, mu)
 %    mu     - martingale drift
 %
 %  Output:
-%    val    - real part of integrand (scalar or vector, same size as u)
+%    g    - real part of integrand
 
 v = - u - 1i/2;
 phi = exp(1i * mu * v) ./ ((1 - 1i * v / p_plus) .* (1 + 1i * v / p_minus));

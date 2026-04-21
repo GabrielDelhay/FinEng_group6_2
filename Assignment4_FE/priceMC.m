@@ -19,7 +19,7 @@ fT       = mu + E_plus - E_minus;
 
 payoff = min(exp(fT), exp(-x));
 
-% Prix = B * E[payoff]
+% Price = B * E[payoff]
 C = B * F0 * (1 - mean(payoff));
 
 end

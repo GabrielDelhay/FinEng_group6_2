@@ -25,7 +25,7 @@ IV_mkt   = cSelect.surface;           % implied vols (Black-Scholes)
 r = interp1(dates, zeroRates, maturity);                      
 B = exp(-r * T);
 F0 = S0 * exp((r - q) * T);      % ATM forward
-x_vec = [-0.05223, 0, 0.15];     % x = log(F/K)
+x_vec = [-0.05223, 0, 0.15];     % x = log(F0/K)
 
 fprintf('S0=%.4f  F0=%.4f  B=%.6f  r=%.4f  q=%.4f  T=%.1f\n\n',S0, F0, B, r, q, T);
 
@@ -46,7 +46,7 @@ for j = 1:3
 
     % Quadrature method
     Integrand = @(u) real(lewisIntegrand(u,x,p_plus,p_minus,mu));
-    I_q      = 2 * quadgk(Integrand, 0, Inf);
+    I_q      = 2 * quadgk(Integrand, 0, Inf); % Integrand is even in the complex sense
     C_quad(j) = B * F0 * (1 - exp(-x/2) / (2*pi) * I_q);
     % Residuals method
     I_r = integralLewis_Residuals(x,p_plus,p_minus,mu);
