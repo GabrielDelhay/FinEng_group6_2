@@ -2,8 +2,8 @@ function C = integralLewis_Residuals(x, p_plus, p_minus, mu)
 
 i = 1i;
 
-if x > 0
-    % x>0: the contour must be closed in the lower half-plane -> I = -2*pi*i * sum(Res_LHP)
+if x > -mu
+    % x>-mu: the contour must be closed in the lower half-plane -> I = -2*pi*i * sum(Res_LHP)
     % Res 1: pole of u^2+0.25 in u = -i/2
     u1 = -i/2;
     v1 = -u1 - i/2;           % v1 = 0  =>  phi(0) = 1
@@ -20,8 +20,8 @@ if x > 0
 
     I = -2*pi*i * (Res1 + Res2);
 
-elseif x < 0
-    % x<0: the contour must be closed in the upper half-plane -> I = +2*pi*i * sum(Res_UHP)
+elseif x < -mu
+    % x<-mu: the contour must be closed in the upper half-plane -> I = +2*pi*i * sum(Res_UHP)
     % Res 1: pole of u^2+0.25 in u = +i/2
     u1 = i/2;
     v1 = -u1 - i/2;           % v1 = -i  =>  phi(-i) = 1 (condition martingale)
