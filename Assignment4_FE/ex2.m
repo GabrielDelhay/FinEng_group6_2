@@ -21,7 +21,7 @@ formatDate = 'dd/mm/yyyy';
 valuationdate = '15/02/2008';
 valuationDate = datenum(valuationdate, formatDate);
 maturityDate = valuationDate + 365;   % Act/365, T=1y
-[datesSet, ratesSet] = readExcelData('MktData_CurveBootstrap.xls', formatDate);
+[datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
 [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
 
 r = interp1(dates, zeroRates, maturityDate, "linear", "extrap");
