@@ -14,7 +14,7 @@ function [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet)
 %   discounts  – column vector of discount factors B(t0, T)
 %   zeroRates  – column vector of zero rates (Act/365, continuously compounded)
 
-settlementDate = datesSet.settlement;
+settlementDate = datesSet.settlementDate;
 
 % Mid-market rates (average of bid and ask)
 midDepos   = mean(ratesSet.depos,   2);
