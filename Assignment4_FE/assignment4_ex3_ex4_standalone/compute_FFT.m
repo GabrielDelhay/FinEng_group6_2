@@ -12,11 +12,11 @@ function [x, I_fft] = compute_FFT(phi, N, du)
 %           Lewis integrand. The call price is then
 %           C(x) = B*F0*(1 - exp(-x/2)/(2*pi).*I_fft(x)).
 
-dx = 2*pi / (N*du);
+dz = 2*pi / (N*du);
 u  = (0:N-1).' * du;
 
-b  = N * dx / 2;
-x  = -b + (0:N-1).' * dx;
+b  = N * dz / 2;
+x  = -b + (0:N-1).' * dz;
 
 % integrand without the Fourier kernel (see lewisIntegrand): the kernel
 % exp(-i*x*u) is supplied by the FFT itself.
