@@ -6,13 +6,13 @@ clear; clc; close all;
 
 %% Bootstrap
 formatDate = 'dd/mm/yyyy';
-[datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
+[datesSet, ratesSet] = readExcelData('MktData_CurveBootstrap.xls', formatDate);
 [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
 
 %% Exercise 1 - Equity Protection Certificate
 
 %% data - contract
-t0       = datesSet.settlementDate;   % start date 
+t0       = datesSet.settlement;   % start date 
 P        = 0.95;                      % protection level
 alpha    = 1.10;                      % participation coefficient
 s        = 0.0130;                    % 130 bp spread over Euribor 3m
@@ -70,6 +70,6 @@ fprintf('  C_basket = %.6f   (SE = %.6f)\n', C_basket, SE_basket);
 fprintf('  95%% CI   = [%.6f , %.6f]\n\n', CI_basket(1), CI_basket(2));
 
 fprintf('Fair upfront X%%:\n');
-fprintf('  X       = %.4f %%   (SE = %.4f %%)\n', 100*X, 100*SE_X);
-fprintf('  95%% CI   = [%.4f %% , %.4f %%]\n', 100*CI_X(1), 100*CI_X(2));
-fprintf('  cash    = %.4f M EUR   (on N = %.0f M EUR)\n', N*X/1e6, N/1e6);
+fprintf('  X       = %.8f %%   (SE = %.6f %%)\n', 100*X, 100*SE_X);
+fprintf('  95%% CI   = [%.6f %% , %.6f %%]\n', 100*CI_X(1), 100*CI_X(2));
+fprintf('  cash    = %.8f M EUR   (on N = %.0f M EUR)\n', N*X/1e6, N/1e6);
