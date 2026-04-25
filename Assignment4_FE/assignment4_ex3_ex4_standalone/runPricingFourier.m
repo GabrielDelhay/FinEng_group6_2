@@ -34,8 +34,8 @@ C_mc3 = priceMC(x_vec3, F0, B, p_plus, p_minus, mu_ex3, 1e6);
 
 % (d) FFT
 N3  = 2^12;
-du3 = 0.05;
-[xg3, I_fft3] = compute_FFT(phi_ex3, N3, du3);
+dx3 = 0.05;
+[xg3, I_fft3] = compute_FFT(phi_ex3, N3, dx3);
 I_int3 = interp1(xg3, I_fft3, x_vec3, 'spline');
 C_fft3 = B * F0 * (1 - exp(-x_vec3/2) ./ (2*pi) .* I_int3);
 
@@ -56,20 +56,20 @@ M  = 12;
 N4 = 2^M;
 
 % Choice 1: small moneyness step (dz = 0.0025)
-dz1 = 0.0025;          du1 = 2*pi / (N4*dz1);
-[xg41, If41] = compute_FFT(phi_ex4, N4, du1);
+dz1 = 0.0025;          dx1 = 2*pi / (N4*dz1);
+[xg41, If41] = compute_FFT(phi_ex4, N4, dx1);
 C_fft41      = B * F0 * (1 - exp(-x_vec4/2) ./ (2*pi) .* ...
                          interp1(xg41, If41, x_vec4, 'spline'));
 
 % Choice 2: extremum in frequency domain (u_max = 500, total length 1000)
-du2 = 1000 / N4;
-[xg42, If42] = compute_FFT(phi_ex4, N4, du2);
+dx2 = 1000 / N4;
+[xg42, If42] = compute_FFT(phi_ex4, N4, dx2);
 C_fft42      = B * F0 * (1 - exp(-x_vec4/2) ./ (2*pi) .* ...
                          interp1(xg42, If42, x_vec4, 'spline'));
 
 % Choice 3: dz = 0.01, perfectly aligned with the 1% moneyness grid
-dz3 = 0.01;            du3 = 2*pi / (N4*dz3);
-[xg43, If43] = compute_FFT(phi_ex4, N4, du3);
+dz3 = 0.01;            dx3 = 2*pi / (N4*dz3);
+[xg43, If43] = compute_FFT(phi_ex4, N4, dx3);
 C_fft43      = B * F0 * (1 - exp(-x_vec4/2) ./ (2*pi) .* ...
                          interp1(xg43, If43, x_vec4, 'spline'));
 
