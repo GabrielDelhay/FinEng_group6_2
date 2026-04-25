@@ -32,14 +32,43 @@ end
 % (c) Monte Carlo
 C_mc3 = priceMC(x_vec3, F0, B, p_plus, p_minus, mu_ex3, 1e6);
 
-% (d) FFT
-N3  = 2^12;
-dx3 = 0.05;
-[xg3, I_fft3] = compute_FFT(phi_ex3, N3, dx3);
-I_int3 = interp1(xg3, I_fft3, x_vec3, 'spline');
-C_fft3 = B * F0 * (1 - exp(-x_vec3/2) ./ (2*pi) .* I_int3);
+% (d) FFT 
+phi_ex3 = @(v) exp(1i*mu_ex3*v) ./ ((1 - 1i*v/p_plus).*(1 + 1i*v/p_minus));
+
+% Config to test: {label, N, parameter, value}
+configs = {
+    'N=2^12, du=0.05 (ref)',  2^12,  0.05;
+    'N=2^12, du=0.25',        2^12,  0.25;
+    'N=2^12, du=0.01',        2^12,  0.01;
+    'N=2^8,  du=0.05',        2^8,   0.05;
+    'N=2^14, du=0.05',        2^14,  0.05;
+    'N=2^12, dz=0.005',       2^12,  2*pi/(2^12 * 0.005);
+    'N=2^12, dz=0.10',        2^12,  2*pi/(2^12 * 0.10);
+};
+
+fprintf('%-30s  %10s  %10s  %10s\n', 'Configuration', 'C(x1)', 'C(x2)', 'C(x3)');
+fprintf('%s\n', repmat('-',1,65));
+
+for k = 1:size(configs,1)
+    Nk  = configs{k,2};
+    duk = configs{k,3};  
+    
+    [xg, I_fft] = compute_FFT(phi_ex3, Nk, duk);
+    
+    if any(x_vec3 < xg(1)) || any(x_vec3 > xg(end))
+        warning('Strike off the grid: %s', configs{k,1});
+        C_fft3 = [NaN NaN NaN];
+    else
+        I_int  = interp1(xg, I_fft, x_vec3, 'spline');
+        C_fft3 = B * F0 * (1 - exp(-x_vec3/2) ./ (2*pi) .* I_int);
+    end
+    
+    fprintf('%-30s  %10.4f  %10.4f  %10.4f\n', configs{k,1}, C_fft3);
+end
 
 print_EX_3( x_vec3, C_quad3, C_res3, C_mc3, C_fft3)
+
+
 %% =============================================================
 %  Exercise 4 - Normal Mean-Variance Mixture (NIG, alpha = 1/2)
 %  =============================================================
