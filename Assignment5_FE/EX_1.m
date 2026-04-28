@@ -22,3 +22,8 @@ implied_vols = [
     22.3, 21.2, 20.3, 19.5, 18.7, 17.3, 16.3, 15.5, 15.0, 15.1, 15.5, 16.0, 16.9;
     21.6, 20.4, 19.5, 18.8, 18.0, 16.6, 15.5, 14.7, 14.1, 14.1, 14.5, 15.0, 15.9
 ];
+% Load and bootstrap the zero rate curve
+formatDate = 'dd/mm/yyyy';
+[datesSet, ratesSet] = readExcelData('MktData_CurveBootstrap.xls', formatDate);
+[dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
+
