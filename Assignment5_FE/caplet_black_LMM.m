@@ -1,37 +1,34 @@
 function price = caplet_black_LMM(L, K, delta, B_pay, tau, sigma)
-% =========================================================
-%  Black caplet formula under LMM (slide 20, Baviera)
+% CAPLET_BLACK_LMM  Vectorized Black caplet price under LMM.
 %
-%  caplet_i = B(0,T_{i+1}) * delta_i * [L_i*N(d1) - K*N(d2)]
+%   caplet = B(0,T_{i+1}) * delta_i * [L_i * N(d1) - K * N(d2)]
 %
-%  with (slide 20):
-%    d1 = (1/(sigma*sqrt(T_i))) * ln(L_i/K) + 0.5*sigma*sqrt(T_i)
-%    d2 = d1 - sigma*sqrt(T_i)
+%   with (Black 76, T-forward measure):
+%     d1 = ( log(L/K) + 0.5*sigma^2*tau ) / ( sigma*sqrt(tau) )
+%     d2 = d1 - sigma*sqrt(tau)
 %
-%  INPUTS:
-%    L      : forward rate L_i(t0)
-%    K      : strike
-%    delta  : Act/360 year fraction of the period
-%    B_pay  : discount factor to payment date B(0, T_{i+1})
-%    tau    : Act/365 time to expiry (= T_i - t0)/365
-%    sigma  : spot vol of this caplet
+%   All inputs may be scalars or arrays of compatible size (MATLAB
+%   element-wise broadcasting). The output has the broadcast shape.
 %
-%  OUTPUT:
-%    price  : caplet price (per unit notional)
-% =========================================================
+% INPUTS:
+%   L      : forward rate(s)         L_i(t0)
+%   K      : strike(s)
+%   delta  : Act/360 year fraction(s) of the caplet period
+%   B_pay  : discount factor(s)      B(0, T_{i+1})
+%   tau    : Act/365 time(s) to expiry, (T_i - t0)/365
+%   sigma  : spot vol(s)             sigma_i
+%
+% OUTPUT:
+%   price  : caplet price(s) per unit notional, broadcast shape
 
-    % Handle degenerate cases
-    if sigma <= 0 || tau <= 0 || L <= 0 || K <= 0
-        price = max(delta * B_pay * (L - K), 0);
-        return;
-    end
-    
-    vol_sqrt_T = sigma * sqrt(tau);
-    
-    % d1 and d2 from Black formula (slide 20, LMM)
-    d1 = (log(L/K) + 0.5 * sigma^2 * tau) / vol_sqrt_T;
+    % Numerical safeguards: avoid div-by-zero in vol_sqrt_T and log(0).
+    % As sigma -> 0 the formula converges to the intrinsic value, which is
+    % the correct limit of a Black-76 caplet.
+
+
+    vol_sqrt_T = sigma .* sqrt(tau);
+    d1 = ( log(L ./ K) + 0.5 .* sigma.^2 .* tau ) ./ vol_sqrt_T;
     d2 = d1 - vol_sqrt_T;
-    
-    % Black caplet price (slide 6 and 20)
-    price = B_pay * delta * (L * normcdf(d1) - K * normcdf(d2));
+
+    price = B_pay .* delta .* ( L .* normcdf(d1) - K .* normcdf(d2) );
 end

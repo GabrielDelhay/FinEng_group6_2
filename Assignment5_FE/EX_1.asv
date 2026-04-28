@@ -142,7 +142,7 @@ i_start = 3;% the last caplet which has flat vol
 % Pre-allocate spot vol matrix
 % Rows = caplet index (from i_start to last cap maturity)
 % Cols = strike index
-n_total_caplets = cap_maturity_idx(end);
+n_total_caplets = size(cap_maturity_idx(end),1); 
 spot_vols = zeros(n_total_caplets, n_strikes);
 
 for j = 1:cap_maturity_idx(1)
@@ -181,12 +181,12 @@ for k = 1:n_strikes
 %occhio a alscaire vuoto
 
         
-        T_alpha = tau_expiry(i_alpha); % taking the index of the first new caplet
-        T_beta = tau_expiry(i_beta);
+        T_alpha_new = tau_expiry(i_alpha); % taking the index of the first new caplet
+        T_beta_new = tau_expiry(i_beta);
 
         f = @(sb) sum_caplets_linear_vol(i_alpha, i_beta, ...
                     fwd_rates, K, delta_fwd, all_B, tau_expiry, ...
-                    sigma_alpha, sb, T_alpha, T_beta) ...
+                    sigma_alpha, sb, T_alpha_new, T_beta_new) ...
                   - delta_cap_price;
 
         try
@@ -199,8 +199,8 @@ for k = 1:n_strikes
 
         % --- Step 4: store spot vols for this bucket (vectorized) ---
         idx_b = (i_alpha:i_beta)';
-        T_beta_old = tau_expiry(i_alpha -1);
-        w = (tau_expiry(idx_b) - T_beta_old) ./ (T_beta - T_beta_old);
+
+        w = (tau_expiry(idx_b) - T_alpha_new) ./ (T_beta_new - T_alpha_new);
         spot_vols(idx_b, k) = sigma_alpha + w .* (sigma_beta - sigma_alpha);
     
 
