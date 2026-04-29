@@ -42,18 +42,18 @@ function NPV_B = price_coupon_leg(notional, schedule, market, bond)
 %% Pre-interpolate spot vols at the relevant strikes.
 % We interpolate ONCE per strike (vectorised across all caplets) and then index the resulting column by the period i
 
-sigma_K1 = interp_spot_vol(market.spot_vols, market.strikes_mkt, bond.K1);
-sigma_K2 = interp_spot_vol(market.spot_vols, market.strikes_mkt, bond.K2);
-sigma_K3 = interp_spot_vol(market.spot_vols, market.strikes_mkt, bond.K3);
+sigma_K1 = interp1(market.strikes_mkt(:), market.spot_vols.', bond.K1, 'spline').';
+sigma_K2 = interp1(market.strikes_mkt(:), market.spot_vols.', bond.K2, 'spline').';
+sigma_K3 = interp1(market.strikes_mkt(:), market.spot_vols.', bond.K3, 'spline').';
 
 %% First fixed coupon (4%)
 
-pv_first = notional * schedule.delta_pay(1) * bond.first_cpn * schedule.B_pay(1)
+pv_first = notional * schedule.delta_pay(1) * bond.first_cpn * schedule.B_pay(1);
 
 %% Regime 1. i = i_first : i_3y
 
 pv_reg1 = 0;
-for i = schedule.i_first : schedule.i_3y;
+for i = schedule.i_first : schedule.i_3y
     L = schedule.fwd_rates(i);
     delta = schedule.delta_pay(i);
     B_pay = schedule.B_pay(i);
@@ -61,7 +61,7 @@ for i = schedule.i_first : schedule.i_3y;
     sigma = sigma_K1(i);
 
     floater = delta * B_pay * (L + bond.spread1);
-    caplet = caplet_black_LMM(L, K1, delta, B_pay, tau, sigma);
+    caplet = caplet_black_LMM(L, bond.K1, delta, B_pay, tau, sigma);
     digital = bond.c_dig1 .* digital_black(L, K1, delta, B_pay, tau, sigma);
 
     pv_reg1 = pv_reg1 + notional * (floater - caplet - digital);
