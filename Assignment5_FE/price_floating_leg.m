@@ -1,4 +1,4 @@
-function NPV_A = price_floating_leg(notional, B_start, B_pay, delta_pay, spread)
+function NPV_A = price_floating_leg(notional, B_pay, delta_pay, spread)
 %  INPUTS:
 %    notional   : N 
 %    B_start    : discount factor B(t0, T_start)  
@@ -9,7 +9,7 @@ function NPV_A = price_floating_leg(notional, B_start, B_pay, delta_pay, spread)
 %  OUTPUT:
 %    NPV        : present value of the floating leg, in currency units
 
-floater_pv = notional * (B_start - B_pay(end));
+floater_pv = notional * (1 - B_pay(end));
 BPV        = sum(delta_pay(:) .* B_pay(:));
 spread_pv  = notional * spread * BPV;
 
