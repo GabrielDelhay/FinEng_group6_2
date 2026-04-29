@@ -62,7 +62,7 @@ for i = schedule.i_first : schedule.i_3y
 
     floater = delta * B_pay * (L + bond.spread1);
     caplet = caplet_black_LMM(L, bond.K1, delta, B_pay, tau, sigma);
-    digital = bond.c_dig1 .* digital_black(L, K1, delta, B_pay, tau, sigma);
+    digital = bond.c_dig1 .* digital_black(L, bond.K1, delta, B_pay, tau, sigma);
 
     pv_reg1 = pv_reg1 + notional * (floater - caplet - digital);
 end

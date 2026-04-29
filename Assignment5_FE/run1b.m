@@ -31,7 +31,7 @@ i_3y  = cap_maturity_idx(3)  + 1;     % period paying at 3y  (i = 12)
 i_6y  = cap_maturity_idx(6)  + 1;     % period paying at 6y  (i = 24)
 i_10y = cap_maturity_idx(10) + 1;     % period paying at 10y (i = 40)
 
-schedule.B_pay     = all_B(2 : i_10y+1);     % B(t0, T_i) for i=1..i_10y
+schedule.B_pay     = B_cap(1 : i_10y);     % B(t0, T_i) for i=1..i_10y
 schedule.delta_pay = delta_fwd(1 : i_10y);   % delta(T_{i-1}, T_i)
 schedule.tau_reset = tau_expiry(1 : i_10y);  % (T_{i-1}-t0)/365
 schedule.fwd_rates = fwd_rates(1 : i_10y);   % L_{i-1}(t0)
@@ -55,8 +55,6 @@ X = (NPV_A - NPV_B) / N;
 %% Output
 
 fprintf('\n=== Pricing of the structured bond (point 1.b) ===\n');
-fprintf('Regime 3 variant       : %s\n', bond.regime3_type);
-fprintf('Notional               : %.0f EUR\n', N);
 fprintf('NPV Party A (floating) : %14.2f EUR\n', NPV_A);
 fprintf('NPV Party B (coupons)  : %14.2f EUR\n', NPV_B);
 fprintf('Upfront X*N            : %14.2f EUR\n', X*N);
