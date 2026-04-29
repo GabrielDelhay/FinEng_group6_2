@@ -88,8 +88,8 @@ T_reset   = cap_dates(1:end-1);
 T_payment = cap_dates(2:end);
 
 % Year fractions via MATLAB built-ins (basis 2 = Act/360, basis 3 = Act/365)
-delta_fwd  = yearfrac(T_reset, T_payment, 2);   % cedola
-tau_expiry = yearfrac(t0,      T_reset,   3);   % 
+delta_fwd  = yearfrac(T_reset, T_payment, 2);  
+tau_expiry = yearfrac(t0,      T_reset,   3);   % yearfrac between t0 and Libor reset time
 
 % Discount factors a T_i e T_{i+1}
 B_Ti  = B_cap(1:end-1);
@@ -117,7 +117,6 @@ if ~all(found)
           mat2str(maturities(~found)));
 end
 cap_maturity_idx = cap_maturity_idx -1;% representing the index of the last couplet in each cap
-i_start = 3;% the last caplet which has flat vol
 %% SECTION 4: Bootstrap LMM spot vols
 %  ALGORITHM:
 %  For each strike k:
@@ -158,7 +157,7 @@ for k = 1:n_strikes
     % we use  B_cap(idx_all+1) in order to obtain DF in payment date of each caplet
     cap_price_already_priced = sum( caplet_black_LMM( ...
                                     fwd_rates(idx_all), K, delta_fwd(idx_all), ...
-                                    B_cap(idx_all+1),  tau_expiry(idx_all), sigma_alpha) )
+                                    B_cap(idx_all+1),  tau_expiry(idx_all), sigma_alpha) );
 
     for j = 2:n_maturities
         Sigma_beta = flat_vols(j, k);           % flat vol for this (mat, strike)
@@ -180,11 +179,11 @@ for k = 1:n_strikes
 %occhio a alscaire vuoto
 %datetime(T_payment, 'ConvertFrom', 'datenum')
         %those are the initial and final times of our CAP
-        T_alpha = T_reset(i_alpha); % taking the index of the first new caplet
+        T_alpha = T_reset(i_alpha-1); % taking the index of the last caplet in the previous cap
         T_beta = T_reset(i_beta);
 
         f = @(sb) sum_caplets_linear_vol(i_alpha, i_beta, ...
-                    fwd_rates, K, delta_fwd, B_cap, T_payment, ...
+                    fwd_rates, K, delta_fwd, B_cap, T_reset, ...
                     sigma_alpha, sb, T_alpha, T_beta, tau_expiry) ...
                   - delta_cap_price;
 
