@@ -1,5 +1,5 @@
 %% 1. Case Study: Structured bond
-
+clc; close all; clear all;
 % Set strikes
 strikes = [1.50, 1.75, 2.00, 2.25, 2.50, 3.00, 3.50, 4.00, 5.00, 6.00, 7.00, 8.00, 10.00];
 
@@ -62,7 +62,7 @@ n_quarters = 4 * 20; % don't consider the last couplet
 raw_dates  = arrayfun(@(q) addtodate(t0, 3*q, 'month'), (1:n_quarters)');
 
 % Apply Modified Following BD adjustment in one shot (vectorized)
-cap_dates   = adj_modfollow(raw_dates); % from 19-May-2008 to 22-Feb-2028
+cap_dates   = adj_modfollow(raw_dates); % from 19-May-2008 to 22-Feb-2028: so is the reset date for each caplet
 n_cap_dates = length(cap_dates);
 
 % The bootstrapped dates are NOT purely quarterly. We therefore
@@ -72,7 +72,7 @@ n_cap_dates = length(cap_dates);
 
 %% SECTION 2: Compute discount factors and forward rates on the caplet schedule
 % Interpolate discount factors at caplet dates
-B_cap = linearRateInterp(dates, discounts, t0, cap_dates);
+B_cap = linearRateInterp(dates, discounts, t0, cap_dates); %discounts in the caplets reset dates
 
 n_caplets = length(cap_dates); % number of potential payment dates
 
@@ -89,7 +89,7 @@ T_payment = cap_dates(2:end);
 
 % Year fractions via MATLAB built-ins (basis 2 = Act/360, basis 3 = Act/365)
 delta_fwd  = yearfrac(T_reset, T_payment, 2);   % cedola
-tau_expiry = yearfrac(t0,      T_reset,   3);   % scaling Black
+tau_expiry = yearfrac(t0,      T_payment,   3);   % scaling Black
 
 % Discount factors a T_i e T_{i+1}
 B_Ti  = B_cap(1:end-1);
@@ -155,9 +155,10 @@ for k = 1:n_strikes
     sigma_alpha = spot_vols(1, k);             
 
     idx_all = (1:cap_maturity_idx(1))';
+    % we use  B_cap(idx_all+1) in order to obtain DF in payment date of each caplet
     cap_price_already_priced = sum( caplet_black_LMM( ...
                                     fwd_rates(idx_all), K, delta_fwd(idx_all), ...
-                                    all_B(idx_all+1),  tau_expiry(idx_all), sigma_alpha) );
+                                    B_cap(idx_all+1),  tau_expiry(idx_all), sigma_alpha) )
 
     for j = 2:n_maturities
         Sigma_beta = flat_vols(j, k);           % flat vol for this (mat, strike)
@@ -168,7 +169,7 @@ for k = 1:n_strikes
         idx_all = (1:i_beta)'; % caplets composing the new cap
         cap_price_flat = sum( caplet_black_LMM( ...
             fwd_rates(idx_all), K, delta_fwd(idx_all), ...
-            all_B(idx_all+1),  tau_expiry(idx_all), Sigma_beta) );
+            B_cap(idx_all+1),  tau_expiry(idx_all), Sigma_beta) );
 
         % --- Step 2: price of NEW caplets only ---
         delta_cap_price = cap_price_flat - cap_price_already_priced;
@@ -177,14 +178,14 @@ for k = 1:n_strikes
      
 
 %occhio a alscaire vuoto
-
-        
-        T_alpha = T_payment(i_alpha); % taking the index of the first new caplet
-        T_beta = T_payment(i_beta);
+%datetime(T_payment, 'ConvertFrom', 'datenum')
+        %those are the initial and final times of our CAP
+        T_alpha = T_reset(i_alpha); % taking the index of the first new caplet
+        T_beta = T_reset(i_beta);
 
         f = @(sb) sum_caplets_linear_vol(i_alpha, i_beta, ...
-                    fwd_rates, K, delta_fwd, all_B, tau_expiry, ...
-                    sigma_alpha, sb, T_alpha, T_beta) ...
+                    fwd_rates, K, delta_fwd, B_cap, T_payment, ...
+                    sigma_alpha, sb, T_alpha, T_beta, tau_expiry) ...
                   - delta_cap_price;
 
         try
@@ -197,8 +198,7 @@ for k = 1:n_strikes
 
         % --- Step 4: store spot vols for this bucket (vectorized) ---
         idx_b = (i_alpha:i_beta)';
-        T_beta_old = tau_expiry(i_alpha -1);
-        w = (tau_expiry(idx_b) - T_beta_old) ./ (T_beta - T_beta_old);
+        w = (T_payment(idx_b)- T_alpha) ./ (T_beta - T_alpha);
         spot_vols(idx_b, k) = sigma_alpha + w .* (sigma_beta - sigma_alpha);
     
 
