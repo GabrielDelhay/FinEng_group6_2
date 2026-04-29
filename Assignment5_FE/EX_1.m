@@ -179,11 +179,11 @@ for k = 1:n_strikes
 %occhio a alscaire vuoto
 %datetime(T_payment, 'ConvertFrom', 'datenum')
         %those are the initial and final times of our CAP
-        T_alpha = T_reset(i_alpha); % taking the index of the first new caplet
+        T_alpha = T_reset(i_alpha-1); % taking the index of the last caplet in the previous cap
         T_beta = T_reset(i_beta);
 
         f = @(sb) sum_caplets_linear_vol(i_alpha, i_beta, ...
-                    fwd_rates, K, delta_fwd, B_cap, T_payment, ...
+                    fwd_rates, K, delta_fwd, B_cap, T_reset, ...
                     sigma_alpha, sb, T_alpha, T_beta, tau_expiry) ...
                   - delta_cap_price;
 
@@ -197,7 +197,7 @@ for k = 1:n_strikes
 
         % --- Step 4: store spot vols for this bucket (vectorized) ---
         idx_b = (i_alpha:i_beta)';
-        w = (T_payment(idx_b)- T_alpha) ./ (T_beta - T_alpha);
+        w = (T_reset(idx_b)- T_alpha) ./ (T_beta - T_alpha);
         spot_vols(idx_b, k) = sigma_alpha + w .* (sigma_beta - sigma_alpha);
     
 
