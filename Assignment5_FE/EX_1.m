@@ -73,8 +73,6 @@ n_cap_dates = length(cap_dates);
 %% SECTION 2: Compute discount factors and forward rates on the caplet schedule
 % Interpolate discount factors at caplet dates
 B_cap = linearRateInterp(dates, discounts, t0, cap_dates);
-all_cap_dates    = [t0; cap_dates(:)];
-all_B            = [1;  B_cap(:)];   %B(0, t0) = 1 by definition
 
 n_caplets = length(cap_dates); % number of potential payment dates
 
@@ -86,16 +84,16 @@ tau_expiry = zeros(n_caplets, 1); % Act/365 year fraction for Black
 % I DAYCOUNT DEVO RIGUARDARLI
 
 % Reset / payment dates (column vectors)
-T_reset   = all_cap_dates(1:end-1);
-T_payment = all_cap_dates(2:end);
+T_reset   = cap_dates(1:end-1);
+T_payment = cap_dates(2:end);
 
 % Year fractions via MATLAB built-ins (basis 2 = Act/360, basis 3 = Act/365)
 delta_fwd  = yearfrac(T_reset, T_payment, 2);   % cedola
 tau_expiry = yearfrac(t0,      T_reset,   3);   % scaling Black
 
 % Discount factors a T_i e T_{i+1}
-B_Ti  = all_B(1:end-1);
-B_Ti1 = all_B(2:end);
+B_Ti  = B_cap(1:end-1);
+B_Ti1 = B_cap(2:end);
 
 % Forward Euribor 3m: L_i = (1/delta_i) * (B(0,T_i)/B(0,T_{i+1}) - 1)
 fwd_rates = (B_Ti ./ B_Ti1 - 1) ./ delta_fwd;
@@ -181,8 +179,8 @@ for k = 1:n_strikes
 %occhio a alscaire vuoto
 
         
-        T_alpha = tau_expiry(i_alpha); % taking the index of the first new caplet
-        T_beta = tau_expiry(i_beta);
+        T_alpha = T_payment(i_alpha); % taking the index of the first new caplet
+        T_beta = T_payment(i_beta);
 
         f = @(sb) sum_caplets_linear_vol(i_alpha, i_beta, ...
                     fwd_rates, K, delta_fwd, all_B, tau_expiry, ...
