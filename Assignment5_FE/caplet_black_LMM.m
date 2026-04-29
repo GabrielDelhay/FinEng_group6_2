@@ -1,29 +1,19 @@
 function price = caplet_black_LMM(L, K, delta, B_pay, tau, sigma)
-% CAPLET_BLACK_LMM  Vectorized Black caplet price under LMM.
-%
-%   caplet = B(0,T_{i+1}) * delta_i * [L_i * N(d1) - K * N(d2)]
-%
-%   with (Black 76, T-forward measure):
-%     d1 = ( log(L/K) + 0.5*sigma^2*tau ) / ( sigma*sqrt(tau) )
-%     d2 = d1 - sigma*sqrt(tau)
+% CAPLET_BLACK_LMM  Vectorized Black caplet pricer.
 %
 %   All inputs may be scalars or arrays of compatible size (MATLAB
 %   element-wise broadcasting). The output has the broadcast shape.
 %
 % INPUTS:
-%   L      : forward rate(s)         L_i(t0)
+%   L      : forward rate(s) of each caplet
 %   K      : strike(s)
 %   delta  : Act/360 year fraction(s) of the caplet period
-%   B_pay  : discount factor(s)      B(0, T_{i+1})
-%   tau    : Act/365 time(s) to expiry, (T_i - t0)/365
-%   sigma  : spot vol(s)             sigma_i
+%   B_pay  : discount factor(s) at the payment date of each caplet
+%   tau    : Act/365 time(s) from t0 to caplet reset
+%   sigma  : caplet spot vol(s)
 %
 % OUTPUT:
 %   price  : caplet price(s) per unit notional, broadcast shape
-
-    % Numerical safeguards: avoid div-by-zero in vol_sqrt_T and log(0).
-    % As sigma -> 0 the formula converges to the intrinsic value, which is
-    % the correct limit of a Black-76 caplet.
 
 
     vol_sqrt_T = sigma .* sqrt(tau);

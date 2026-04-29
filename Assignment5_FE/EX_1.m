@@ -34,111 +34,84 @@ formatDate = 'dd/mm/yyyy';
 t0 = dates(1);  % Settlement date: 19/02/2008
 
 % Exercise 1a: LMM Spot Vol Calibration
-%  
-%  GOAL: Extract LMM spot vols from market flat cap vols
 %
-%  THEORY:
-%    - A Cap(T,K) = sum of Caplets, each priced with Black:
-%        caplet_i = B(0,T_{i+1}) * delta_i * [L_i*N(d1) - K*N(d2)]
-%      where d1,d2 use the SPOT vol sigma_i (not flat vol)
-%    - Flat vol Sigma_n: same vol for ALL caplets in cap -> 
-%        Cap(T_n, K) = sum_i caplet(i, Sigma_n)   [market quote]
-%    - Spot vol sigma_i: TRUE vol of forward rate i ->
-%        Cap(T_n, K) = sum_i caplet(i, sigma_i)   [model decomp]
-%    - Bootstrap: for each new maturity T_n, the price of the
-%      NEW caplets = Cap(T_n) - Cap(T_{n-1}), so we solve for
-%      the spot vols in the new bucket via the linear constraint
-%      (slide 23):
-%        sigma_i = sigma(T_alpha) + (T_i - T_alpha)/(T_beta - T_alpha)
-%                  * (sigma(T_beta) - sigma(T_alpha))
-%      i.e. spot vols are LINEARLY interpolated within each bucket
-%
-% the caplet from T_0 to T_1 (first 3m) is assumed already fixed at t_0, so caps start from caplet 2.
+% Build the quarterly caplet schedule, retrieve discount factors and
+% forward rates on it, then bootstrap the LMM spot vols on the same
+% (strike, maturity) grid as the input flat vols. The first caplet
+% (t0 -> 3m) is treated as already fixed at t0, so it contributes only
+% an intrinsic-value term to every cap.
 
 %%  SECTION 1: Build the quarterly caplet schedule
 
-% Quarterly raw dates (3m, 6m, ..., 20Y) — addtodate is scalar, so arrayfun
-n_quarters = 4 * 20; % don't consider the last couplet
+% Raw quarterly dates from t0 + 3m up to t0 + 20Y. addtodate is scalar,
+% so arrayfun is used to vectorize over the quarter index.
+n_quarters = 4 * 20;
 raw_dates  = arrayfun(@(q) addtodate(t0, 3*q, 'month'), (1:n_quarters)');
 
-% Apply Modified Following BD adjustment in one shot (vectorized)
-cap_dates   = adj_modfollow(raw_dates); % from 19-May-2008 to 22-Feb-2028: so is the reset date for each caplet
+% Adjust each raw date with the Modified Following BD convention.
+cap_dates   = adj_modfollow(raw_dates); % first reset 19-May-2008, last 22-Feb-2028
 n_cap_dates = length(cap_dates);
 
-% The bootstrapped dates are NOT purely quarterly. We therefore
-% interpolate discount factors from the bootstrap curve onto
-% the quarterly caplet schedule defined above.
-% log-linear interpolation is used (standard for discount factors).
+% The discount curve is sampled at irregular dates (depos / futures /
+% swap pillars), so we resample it onto cap_dates in the next section.
 
 %% SECTION 2: Compute discount factors and forward rates on the caplet schedule
-% Interpolate discount factors at caplet dates
-B_cap = linearRateInterp(dates, discounts, t0, cap_dates); %discounts in the caplets reset dates
+% Discount factors at every caplet reset date.
+B_cap = linearRateInterp(dates, discounts, t0, cap_dates); % B(t0, T_i) for each caplet
 
-n_caplets = length(cap_dates); % number of potential payment dates
+n_caplets = length(cap_dates); % number of caplet payment dates
 
-% Pre-allocate forward rates and day count fractions
-fwd_rates = zeros(n_caplets, 1); % L_i = forward rate for caplet i
-delta_fwd = zeros(n_caplets, 1); % Act/360 year fraction for coupon
-tau_expiry = zeros(n_caplets, 1); % Act/365 year fraction for Black
+% Pre-allocation (overwritten below by the vectorized assignments).
+fwd_rates  = zeros(n_caplets, 1); % forward rate of each caplet
+delta_fwd  = zeros(n_caplets, 1); % Act/360 year fraction of each caplet period
+tau_expiry = zeros(n_caplets, 1); % Act/365 time from t0 to caplet reset
 
-% I DAYCOUNT DEVO RIGUARDARLI
-
-% Reset / payment dates (column vectors)
+% Reset / payment dates (column vectors).
 T_reset   = cap_dates(1:end-1);
 T_payment = cap_dates(2:end);
 
-% Year fractions via MATLAB built-ins (basis 2 = Act/360, basis 3 = Act/365)
-delta_fwd  = yearfrac(T_reset, T_payment, 2);  
-tau_expiry = yearfrac(t0,      T_reset,   3);   % yearfrac between t0 and Libor reset time
+% Year fractions via MATLAB built-ins (basis 2 = Act/360, basis 3 = Act/365).
+delta_fwd  = yearfrac(T_reset, T_payment, 2);
+tau_expiry = yearfrac(t0,      T_reset,   3);   % time from t0 to each caplet reset
 
-% Discount factors a T_i e T_{i+1}
+% Discount factors at the reset and payment date of each caplet.
 B_Ti  = B_cap(1:end-1);
 B_Ti1 = B_cap(2:end);
 
-% Forward Euribor 3m: L_i = (1/delta_i) * (B(0,T_i)/B(0,T_{i+1}) - 1)
+% Quarterly forward Euribor rates implied by the discount factors.
 fwd_rates = (B_Ti ./ B_Ti1 - 1) ./ delta_fwd;
 
 %% SECTION 3: Map cap maturities to caplet indices
-%
-%  For each cap maturity (1Y, 2Y, ..., 20Y) find the caplet index that
-%  pays at that date, applying the Modified Following BD Convention.
-%  (First caplet excluded: cap starts from i_start = 2)
 
-% Target dates = t0 + n years, then Modified Following adjustment
+% Target dates = t0 + n years, then Modified Following adjustment.
 raw_targets  = arrayfun(@(y) addtodate(t0, y, 'year'), maturities(:));
 target_dates = adj_modfollow(raw_targets);
 
-% Corresponding indices inside cap_dates (vectorized)
-% cap_maturity_indx signals the first caplet of the new cap which has to
-% be computed
+% Position of each target date inside cap_dates (vectorized search).
+% After the -1 shift below, cap_maturity_idx(j) is the index of the
+% LAST caplet that belongs to cap j.
 [found, cap_maturity_idx] = ismember(target_dates, cap_dates);
 if ~all(found)
     error('Cap maturities not found in cap_dates: %s', ...
           mat2str(maturities(~found)));
 end
-cap_maturity_idx = cap_maturity_idx -1;% representing the index of the last couplet in each cap
+cap_maturity_idx = cap_maturity_idx -1;% index of the last caplet of each cap
 %% SECTION 4: Bootstrap LMM spot vols
-%  ALGORITHM:
-%  For each strike k:
-%    For each maturity bucket [T_{alpha}, T_{beta}]:
-%      1. Compute market cap price Cap_mkt(T_beta, K) using flat vol
-%      2. Subtract already-priced caplets from previous buckets
-%         -> get Delta_C = price of NEW caplets in this bucket
-%      3. Within the bucket, spot vols are LINEARLY interpolated:
-%           sigma_i = sigma_alpha + (T_i - T_alpha)/(T_beta - T_alpha)
-%                     * (sigma_beta - sigma_alpha)
-%         where sigma_alpha is known (last bucket's endpoint)
-%         and sigma_beta is the unknown to solve for
-%      4. Solve for sigma_beta such that 
-%           sum_{i in bucket} caplet(i, sigma_i) = Delta_C
-%         using fzero (1D root finding)
+%  Per strike, iterate over the maturity buckets:
+%    1. Re-price the cap at T_j with the market flat vol.
+%    2. Subtract the price of caplets already pinned in earlier buckets.
+%    3. Solve via fzero for the right-edge sigma_beta so the new caplets
+%       (with linearly-interpolated vols between sigma_alpha and
+%       sigma_beta) reproduce that residual.
+%    4. Store the interpolated spot vols of the bucket.
 %
-%  OUTPUT: spot_vols(i, k) = spot vol of caplet i for strike k
-%          (same grid as flat vols: 13 strikes x n_caplets)
+%  The 1Y bucket is pre-filled with the 1Y flat vol before entering the
+%  loop, so the bucket loop starts at j = 2.
+%
+%  OUTPUT: spot_vols(i, k) = spot vol of caplet i for strike k.
 
-% Pre-allocate spot vol matrix
-% Rows = caplet index (from i_start to last cap maturity)
-% Cols = strike index
+% Pre-allocate the spot vol matrix.
+% Rows = caplet index, Cols = strike index.
 n_total_caplets = cap_maturity_idx(end);
 spot_vols = zeros(n_total_caplets, n_strikes);
 
@@ -150,22 +123,24 @@ end
 for k = 1:n_strikes
     K = strikes(k) / 100; % strike in decimal
 
-    % Initial state for this strike
-    sigma_alpha = spot_vols(1, k);             
+    % Initial state for this strike: every caplet in the 1Y bucket shares
+    % the 1Y flat vol, so we read it from the pre-filled spot_vols.
+    sigma_alpha = spot_vols(1, k);
 
     idx_all = (1:cap_maturity_idx(1))';
-    % we use  B_cap(idx_all+1) in order to obtain DF in payment date of each caplet
+    % B_cap(idx_all+1) gives the discount factor at the payment date of
+    % each caplet in the 1Y bucket.
     cap_price_already_priced = sum( caplet_black_LMM( ...
                                     fwd_rates(idx_all), K, delta_fwd(idx_all), ...
                                     B_cap(idx_all+1),  tau_expiry(idx_all), sigma_alpha) );
 
     for j = 2:n_maturities
-        Sigma_beta = flat_vols(j, k);           % flat vol for this (mat, strike)
-        i_alpha = cap_maturity_idx(j-1)+1;
-        i_beta  = cap_maturity_idx(j);        % last caplet for cap j
+        Sigma_beta = flat_vols(j, k);           % market flat vol for cap j at strike k
+        i_alpha = cap_maturity_idx(j-1)+1;      % first new caplet in this bucket
+        i_beta  = cap_maturity_idx(j);          % last caplet of cap j
 
         % --- Step 1: market cap price at T_j (vectorized over caplets) ---
-        idx_all = (1:i_beta)'; % caplets composing the new cap
+        idx_all = (1:i_beta)'; % every caplet that composes cap j
         cap_price_flat = sum( caplet_black_LMM( ...
             fwd_rates(idx_all), K, delta_fwd(idx_all), ...
             B_cap(idx_all+1),  tau_expiry(idx_all), Sigma_beta) );
@@ -174,12 +149,9 @@ for k = 1:n_strikes
         delta_cap_price = cap_price_flat - cap_price_already_priced;
 
         % --- Step 3: bucket boundaries and root finding ---
-     
-
-%occhio a alscaire vuoto
-%datetime(T_payment, 'ConvertFrom', 'datenum')
-        %those are the initial and final times of our CAP
-        T_alpha = T_reset(i_alpha-1); % taking the index of the last caplet in the previous cap
+        % T_alpha = reset of the last caplet of the previous cap,
+        % T_beta  = reset of the last caplet of the current cap.
+        T_alpha = T_reset(i_alpha-1);
         T_beta = T_reset(i_beta);
 
         f = @(sb) sum_caplets_linear_vol(i_alpha, i_beta, ...
@@ -201,15 +173,16 @@ for k = 1:n_strikes
         spot_vols(idx_b, k) = sigma_alpha + w .* (sigma_beta - sigma_alpha);
     
 
-        % --- Step 5: update running totals (NO recomputation needed) ---
-        % After fzero converges, sum of caplets in (i_start..i_beta_new) with
-        % the stored spot vols is exactly cap_price_flat by construction.
+        % --- Step 5: update running totals for the next bucket ---
+        % After fzero converges, the cap price already covered up to
+        % i_beta equals cap_price_flat, so no recomputation is needed.
         sigma_alpha              = sigma_beta;
         cap_price_already_priced = cap_price_flat;
     end
 end
 %% SECTION 5: Display results
-%  Show spot vols at cap maturity dates (same grid as input) for easy comparison with flat vols
+%  Print the spot vols at cap maturity dates so the output sits on the
+%  same grid as the input flat vols for direct comparison.
 
 fprintf('\n=== LMM Spot Vols (at cap maturity dates) [%%] ===\n');
 fprintf('Maturity |');

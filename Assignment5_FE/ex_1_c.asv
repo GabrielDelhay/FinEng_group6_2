@@ -1,0 +1,43 @@
+formatDate = 'dd/mm/yyyy';
+[datesSet, ratesSet] = readExcelData('MktData_CurveBootstrap.xls', formatDate);
+[dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
+t0 = dates(1);  % Settlement date: 19/02/2008
+% nel boostrap usiamo: i primi 3 depos, i primi 7 futures e tutti gli swap
+% tranne il primo
+
+BPV = 0.0001;
+n_depos = 3;
+n_futures = 7;
+n_swaps = ;
+price = zeros(n_swaps + n_futures + n_depos - 1);
+
+%for depos
+for i = 1:n_depos
+    ratesSet.depos(i,:) += BPV;
+    [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
+    price(i) = ex2();
+end
+
+% for futers
+for i = 1:n_futures
+    ratesSet.futures(i,:) += BPV;
+    [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
+    price(n_depos + i) = ex2();
+end
+
+% for swaps: we don't boostrap the first one
+for i = 2:n_swaps
+    ratesSet.futures(i,:) += BPV;
+    [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
+    price(n_depos + n_futures + i - 1) = ex2(); % minus 1 since we skipped the first one
+end
+
+price = ex2();
+
+
+
+
+
+
+
+
