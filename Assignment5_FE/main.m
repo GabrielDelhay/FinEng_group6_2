@@ -96,8 +96,8 @@ price = zeros(n_total, 1);
 
 % Compute initial true_price (Baseline) in EUR
 % Extract smile upfront (5th output) and scale by Notional
-[~, ~, ~, ~, X_smile_base] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, fwd_rates, cap_maturity_idx, spot_vols, strikes);
-true_price = X_smile_base * N;
+[~, ~, X_flat_base, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, fwd_rates, cap_maturity_idx, spot_vols, strikes);
+true_price = X_flat_base * N;
 
 idx = 1; 
 
@@ -111,8 +111,8 @@ for i = 1:n_depos
         lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
     
     % Recompute price and extract new Upfront
-    [~, ~, ~, ~, X_smile_bump] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
-    price(idx) = X_smile_bump * N;
+    [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+    price(idx) = X_flat_bump * N;
     
     ratesSet.depos(i, :) = ratesSet.depos(i, :) - BPV;  % Restore
     idx = idx + 1;
@@ -126,8 +126,8 @@ for i = 1:n_futures
     [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
         lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
         
-    [~, ~, ~, ~, X_smile_bump] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
-    price(idx) = X_smile_bump * N;
+    [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+    price(idx) = X_flat_bump * N;
     
     ratesSet.futures(i, :) = ratesSet.futures(i, :) - BPV;
     idx = idx + 1;
@@ -141,8 +141,8 @@ for i = 2:n_swaps
     [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
         lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
         
-    [~, ~, ~, ~, X_smile_bump] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
-    price(idx) = X_smile_bump * N;
+    [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+    price(idx) = X_flat_bump * N;
     
     ratesSet.swaps(i, :) = ratesSet.swaps(i, :) - BPV; 
     idx = idx + 1;
@@ -159,14 +159,21 @@ disp(T_delta);
 fprintf('Total Delta (Sum of Buckets): %.2f EUR\n', sum(delta));
 %% EXERCISE 1.d
 % Total vega
-dVol = 0.01;
+dVol = 0.0001;
 flat_vols_up = flat_vols + dVol;
 [spot_vols_up, ~, ~, ~, ~, ~, ~, ~] = ...
 lmm_spot_vols(flat_vols_up, strikes, maturities, dates, discounts, t0);
-
 [~, ~, X_flat_up_vega, ~, ~] = ...
     price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
                           fwd_rates, cap_maturity_idx, spot_vols_up, strikes);
-vega_total_b = (X_flat_up_vega - X_flat) * N; 
+flat_vols_down = flat_vols - dVol;
+[spot_vols_down, ~, ~, ~, ~, ~, ~, ~] = ...
+lmm_spot_vols(flat_vols_down, strikes, maturities, dates, discounts, t0);
+[~, ~, X_flat_down_vega, ~, ~] = ...
+    price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
+                          fwd_rates, cap_maturity_idx, spot_vols_down, strikes);
+vega_total_b = (X_flat_up_vega - X_flat_down_vega) * N * 100/2; 
 fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
+
+%% EXERCISE 1.e
 
