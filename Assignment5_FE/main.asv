@@ -163,10 +163,15 @@ dVol = 0.01;
 flat_vols_up = flat_vols + dVol;
 [spot_vols_up, ~, ~, ~, ~, ~, ~, ~] = ...
 lmm_spot_vols(flat_vols_up, strikes, maturities, dates, discounts, t0);
+i_10y = cap_maturity_idx(10)+1;
+market_up.spot_vols = spot_vols_up(1:i_10y, :);
+market_up.strikes_mkt = strikes / 100;
+bond.use_smile = false;
+NPV_B_up = price_coupon_leg(N, schedule, market_up, bond);     %floating leg doesn't change
+vega_total_b = (NPV_B_flat - NPV_B_up);   %how much the upfront is changing. sign coherent with the part before 
+fprintf('Total Vega (+1bp of flat vol): %.2f EUR\n', vega_total_b);
 
-[~, ~, X_flat_up_vega, ~, ~] = ...
+[NPV_A, NPV_B_flat, X_flat, NPV_B_smile, X_smile] = ...
     price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                          fwd_rates, cap_maturity_idx, spot_vols_up, strikes);
-vega_total_b = (X_flat_up_vega - X_flat) * N; 
-fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
+                          fwd_rates, cap_maturity_idx, spot_vols, strikes);
 
