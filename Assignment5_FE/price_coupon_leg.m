@@ -54,9 +54,9 @@ if use_smile
     h        = 1e-4;
     sigma_up = interp1(market.strikes_mkt(:), market.spot_vols.', K_vec+h, 'spline').';
     sigma_dn = interp1(market.strikes_mkt(:), market.spot_vols.', K_vec-h, 'spline').';
-    slope_K  = (sigma_up - sigma_dn) / (2*h);
+    dsigma_dk  = (sigma_up - sigma_dn) / (2*h);
 else
-    slope_K  = zeros(size(sigma_K));   % no correction
+    dsigma_dk  = zeros(size(sigma_K));   % no correction
 end
 
 %% First fixed coupon (4%)
@@ -65,17 +65,17 @@ pv_first = notional * schedule.delta_pay(1) * bond.first_cpn * schedule.B_pay(1)
 %% Regime 1. i = i_first : i_3y
 pv_reg1 = priceRegime(notional, schedule, schedule.i_first, schedule.i_3y, ...
                       bond.K1, bond.spread1, bond.c_dig1, ...
-                      sigma_K(:,1), slope_K(:,1), use_smile);
+                      sigma_K(:,1), dsigma_dk(:,1), use_smile);
 
 %% Regime 2. i = i_3y+1 : i_6y
 pv_reg2 = priceRegime(notional, schedule, schedule.i_3y+1, schedule.i_6y, ...
                       bond.K2, bond.spread2, bond.c_dig2, ...
-                      sigma_K(:,2), slope_K(:,2), use_smile);
+                      sigma_K(:,2), dsigma_dk(:,2), use_smile);
 
 %% Regime 3. i = i_6y+1 : i_10y
 pv_reg3 = priceRegime(notional, schedule, schedule.i_6y+1, schedule.i_10y, ...
                       bond.K3, bond.spread3, bond.c_dig3, ...
-                      sigma_K(:,3), slope_K(:,3), use_smile);
+                      sigma_K(:,3), dsigma_dk(:,3), use_smile);
 
 %% NPV Party B
 NPV_B = pv_first + pv_reg1 + pv_reg2 + pv_reg3;
@@ -90,7 +90,7 @@ end
 
 function pv = priceRegime(notional, schedule, i_start, i_end, ...
                           K_reg, spread_reg, c_dig_reg, ...
-                          sigma_reg, slope_reg, use_smile)
+                          sigma_reg, dsigma_dk_reg, use_smile)
 
 pv = 0;
 for i = i_start : i_end
@@ -105,7 +105,7 @@ for i = i_start : i_end
 
     if use_smile
         digital = c_dig_reg .* digital_black_smile( ...
-                       L, K_reg, delta, B_pay, tau, sigma, slope_reg(i));
+                       L, K_reg, delta, B_pay, tau, sigma, dsigma_dk_reg(i));
     else
         digital = c_dig_reg .* digital_black( ...
                        L, K_reg, delta, B_pay, tau, sigma);
