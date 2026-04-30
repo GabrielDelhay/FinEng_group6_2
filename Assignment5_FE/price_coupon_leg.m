@@ -5,14 +5,11 @@ function NPV_B = price_coupon_leg(notional, schedule, market, bond)
 %                       = (L+1%) - (L-4.20%)+ - 0.70% * 1{L>4.20%}
 %    i_3y+1..i_6y     : Regime 2: L + 1.20% if L<=4.70% else 4.90%
 %                       = (L+1.20%) - (L-4.70%)+ - 0.70% * 1{L>4.70%}
-%    i_6y+1..i_10y    : Regime 3, two variants in the termsheet:
-%        (3a) L + 1.10%  CAPPED at 5.10%
-%             = (L+1.10%) - (L-4.00%)+
-%        (3b) L + 1.30%  if L<=5.40% else 5.60%
-%             = (L+1.30%) - (L-5.40%)+ - 0.90% * 1{L>5.40%}
+%    i_6y+1..i_10y    : Regime 3: L + 1.30% if L<=5.40% else 5.60%
+%                       = (L+1.30%) - (L-5.40%)+ - 0.90% * 1{L>5.40%}
 %
 %  INPUTS:
-%    notional  : N 
+%    notional  : N
 %
 %    schedule  : struct with fields (all column vectors of length N_total
 %                aligned with EX_1.m indexing on periods)
@@ -30,75 +27,90 @@ function NPV_B = price_coupon_leg(notional, schedule, market, bond)
 %       .strikes_mkt  : (1 x N_strikes) market strikes [decimal]
 %
 %    bond      : struct
-%       .first_cpn      : value of the first fixed coupon 
+%       .first_cpn      : value of the first fixed coupon
 %       .spread1, .K1, .c_dig1 : Regime 1 parameters
 %       .spread2, .K2, .c_dig2 : Regime 2 parameters
-%       .regime3_type   : '3a' or '3b'
-%       .spread3, .K3, .c_dig3 : Regime 3 parameters (c_dig3 = 0 if 3a)
+%       .spread3, .K3, .c_dig3 : Regime 3 parameters
+%       .use_smile  (opt)      : false (default) -> flat-Black digital
+%                                true            -> smile-corrected digital
 %
 %  OUTPUT:
-%    NPV        : present value of the coupon leg, in currency units
+%    NPV_B  : present value of the coupon leg, in currency units
 
+%% Pricing mode flag (flat Black vs smile-corrected)
+if ~isfield(bond, 'use_smile') || ~bond.use_smile
+    use_smile = false;
+else
+    use_smile = true;
+end
 %% Pre-interpolate spot vols at the relevant strikes.
-% We interpolate ONCE per strike (vectorised across all caplets) and then index the resulting column by the period i
+%  Single batched call returns sigma_K of size (N x 3): column j has the caplet spot vol at strike K_j over all reset dates.
+%  When use_smile is on, we additionally compute the smile slope dsigma/dK at each K_j via central differences on the same spline.
 
-sigma_K1 = interp1(market.strikes_mkt(:), market.spot_vols.', bond.K1, 'spline').';
-sigma_K2 = interp1(market.strikes_mkt(:), market.spot_vols.', bond.K2, 'spline').';
-sigma_K3 = interp1(market.strikes_mkt(:), market.spot_vols.', bond.K3, 'spline').';
+K_vec    = [bond.K1, bond.K2, bond.K3];
+sigma_K  = interp1(market.strikes_mkt(:), market.spot_vols.', K_vec, 'spline').';
+
+if use_smile
+    h        = 1e-4;
+    sigma_up = interp1(market.strikes_mkt(:), market.spot_vols.', K_vec+h, 'spline').';
+    sigma_dn = interp1(market.strikes_mkt(:), market.spot_vols.', K_vec-h, 'spline').';
+    slope_K  = (sigma_up - sigma_dn) / (2*h);
+else
+    slope_K  = zeros(size(sigma_K));   % no correction
+end
 
 %% First fixed coupon (4%)
-
 pv_first = notional * schedule.delta_pay(1) * bond.first_cpn * schedule.B_pay(1);
 
 %% Regime 1. i = i_first : i_3y
+pv_reg1 = priceRegime(notional, schedule, schedule.i_first, schedule.i_3y, ...
+                      bond.K1, bond.spread1, bond.c_dig1, ...
+                      sigma_K(:,1), slope_K(:,1), use_smile);
 
-pv_reg1 = 0;
-for i = schedule.i_first : schedule.i_3y
-    L = schedule.fwd_rates(i);
-    delta = schedule.delta_pay(i);
-    B_pay = schedule.B_pay(i);
-    tau = schedule.tau_reset(i);
-    sigma = sigma_K1(i);
-
-    floater = delta * B_pay * (L + bond.spread1);
-    caplet = caplet_black_LMM(L, bond.K1, delta, B_pay, tau, sigma);
-    digital = bond.c_dig1 .* digital_black(L, bond.K1, delta, B_pay, tau, sigma);
-
-    pv_reg1 = pv_reg1 + notional * (floater - caplet - digital);
-end
 %% Regime 2. i = i_3y+1 : i_6y
+pv_reg2 = priceRegime(notional, schedule, schedule.i_3y+1, schedule.i_6y, ...
+                      bond.K2, bond.spread2, bond.c_dig2, ...
+                      sigma_K(:,2), slope_K(:,2), use_smile);
 
-pv_reg2 = 0;
-for i = schedule.i_3y + 1 : schedule.i_6y
-    L = schedule.fwd_rates(i);
-    delta = schedule.delta_pay(i);
-    B_pay = schedule.B_pay(i);
-    tau = schedule.tau_reset(i);
-    sigma = sigma_K2(i);
-
-    floater = delta * B_pay * (L + bond.spread2);
-    caplet = caplet_black_LMM(L, bond.K2, delta, B_pay, tau, sigma);
-    digital = bond.c_dig2 .* digital_black(L, bond.K2, delta, B_pay, tau, sigma);
-
-    pv_reg2 = pv_reg2 + notional * (floater - caplet - digital);
-end
 %% Regime 3. i = i_6y+1 : i_10y
+pv_reg3 = priceRegime(notional, schedule, schedule.i_6y+1, schedule.i_10y, ...
+                      bond.K3, bond.spread3, bond.c_dig3, ...
+                      sigma_K(:,3), slope_K(:,3), use_smile);
 
-pv_reg3 = 0;
-for i = schedule.i_6y + 1 : schedule.i_10y
-    L = schedule.fwd_rates(i);
-    delta = schedule.delta_pay(i);
-    B_pay = schedule.B_pay(i);
-    tau = schedule.tau_reset(i);
-    sigma = sigma_K3(i);
-
-    floater = delta * B_pay * (L + bond.spread3);
-    caplet = caplet_black_LMM(L, bond.K3, delta, B_pay, tau, sigma);
-    digital = bond.c_dig3 .* digital_black(L, bond.K3, delta, B_pay, tau, sigma);
-
-    pv_reg3 = pv_reg3 + notional * (floater - caplet - digital);
-end
 %% NPV Party B
 NPV_B = pv_first + pv_reg1 + pv_reg2 + pv_reg3;
 
+end
+
+
+
+
+
+%% Local helper: prices one regime block
+
+function pv = priceRegime(notional, schedule, i_start, i_end, ...
+                          K_reg, spread_reg, c_dig_reg, ...
+                          sigma_reg, slope_reg, use_smile)
+
+pv = 0;
+for i = i_start : i_end
+    L     = schedule.fwd_rates(i);
+    delta = schedule.delta_pay(i);
+    B_pay = schedule.B_pay(i);
+    tau   = schedule.tau_reset(i);
+    sigma = sigma_reg(i);
+
+    floater = delta * B_pay * (L + spread_reg);
+    caplet  = caplet_black_LMM(L, K_reg, delta, B_pay, tau, sigma);
+
+    if use_smile
+        digital = c_dig_reg .* digital_black_smile( ...
+                       L, K_reg, delta, B_pay, tau, sigma, slope_reg(i));
+    else
+        digital = c_dig_reg .* digital_black( ...
+                       L, K_reg, delta, B_pay, tau, sigma);
+    end
+
+    pv = pv + notional * (floater - caplet - digital);
+end
 end

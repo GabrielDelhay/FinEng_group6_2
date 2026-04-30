@@ -10,8 +10,8 @@ function price = digital_black(L, K, delta, B_pay, tau, sigma)
 %  OUTPUT:
 %    price  : digital price per unit notional, in "rate units"
 
-    vol_sqrt_T = sigma * sqrt(tau);
-    d2 = (log(L/K) - 0.5 * sigma^2 * tau) / vol_sqrt_T;
-    
-    price = B_pay * delta * normcdf(d2);
+vol_sqrt_T = sigma .* sqrt(tau);
+d2 = (log(L./K) - 0.5 .* sigma.^2 .* tau) ./ vol_sqrt_T;
+
+price = B_pay .* delta .* normcdf(d2);
 end
