@@ -95,7 +95,6 @@ n_total = n_depos + n_futures + (n_swaps - 1);
 price = zeros(n_total, 1);
 
 % Compute initial true_price (Baseline) in EUR
-% Extract smile upfront (5th output) and scale by Notional
 [~, ~, X_flat_base, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, fwd_rates, cap_maturity_idx, spot_vols, strikes);
 true_price = X_flat_base * N;
 
@@ -104,11 +103,11 @@ idx = 1;
 % 1. Bump Depos
 for i = 1:n_depos
     ratesSet.depos(i, :) = ratesSet.depos(i, :) + BPV;  % Bump
-    [d_bump, disc_bump, ~] = bootstrap(datesSet, ratesSet);
+    [dates, disc_bump, ~] = bootstrap(datesSet, ratesSet);
     
     % Recompute curve-dependent variables (forwards, spot vols)
     [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
-        lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
+        lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
     
     % Recompute price and extract new Upfront
     [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
@@ -121,10 +120,10 @@ end
 % 2. Bump Futures
 for i = 1:n_futures
     ratesSet.futures(i, :) = ratesSet.futures(i, :) + BPV; 
-    [d_bump, disc_bump, ~] = bootstrap(datesSet, ratesSet);
+    [dates, disc_bump, ~] = bootstrap(datesSet, ratesSet);
     
     [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
-        lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
+        lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
         
     [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
     price(idx) = X_flat_bump * N;
@@ -136,10 +135,10 @@ end
 % 3. Bump Swaps (skip the first)
 for i = 2:n_swaps
     ratesSet.swaps(i, :) = ratesSet.swaps(i, :) + BPV; 
-    [d_bump, disc_bump, ~] = bootstrap(datesSet, ratesSet);
+    [dates, disc_bump, ~] = bootstrap(datesSet, ratesSet);
     
     [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
-        lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
+        lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
         
     [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
     price(idx) = X_flat_bump * N;
@@ -176,4 +175,27 @@ vega_total_b = (X_flat_up_vega - X_flat_down_vega) * N * 100/2;
 fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
 
 %% EXERCISE 1.e
+% Coarse-grained bucket deltas (0-2y, 2-6y, 6-10y)
+% Bucket 1: 0-2y  -> Depos (1:3) + Futures (1:7) + Swap_2 (swap idx 2)
+% Bucket 2: 2-6y  -> Swaps from ~2y to 6y (swap idx 3:6)
+% Bucket 3: 6-10y -> Swaps from ~6y to 10y (swap idx 7:10)
+[~, ~, X_flat_base, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, fwd_rates, cap_maturity_idx, spot_vols, strikes);
+true_price = X_flat_base * N;
+bucket_delta = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures);
 
+fprintf(['\n=== Coarse-Grained Bucket Deltas ===\n', 'Bucket 0-2y  : %10.2f EUR\n', 'Bucket 2-6y  : %10.2f EUR\n', ...
+         'Bucket 6-10y : %10.2f EUR\n','Total        : %10.2f EUR\n'], bucket_delta(1), bucket_delta(2), bucket_delta(3), sum(bucket_delta));
+
+% MISSING HEDGING WITH SWAPS
+
+%% EXERCISE 1.f
+bucket_vega = coarse_bucket_vega(flat_vols, strikes, maturities, dates, discounts, ...
+    t0, N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
+    fwd_rates, cap_maturity_idx, spot_vols, true_price, dVol);
+
+fprintf('\n=== Coarse-Grained Bucket Vegas ===\n');
+fprintf('Bucket 0-6y  : %10.2f EUR\n', bucket_vega(1));
+fprintf('Bucket 6-10y : %10.2f EUR\n', bucket_vega(2));
+fprintf('Total        : %10.2f EUR\n', sum(bucket_vega));
+
+% MISSING HEDGING WITH CAPS
