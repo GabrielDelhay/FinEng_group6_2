@@ -18,7 +18,7 @@ vol_sqrt_T = sigma * sqrt(tau);
 d1 = ( log(L/K) + 0.5 * sigma^2 * tau ) / vol_sqrt_T;
 d2 = d1 - vol_sqrt_T;
 
-price_black = B_pay * delta * normcdf(d2);
+price_black = B_pay * delta * normcdf(d2);    % The extra delta turns the annualized digital coupon c_dig (a rate, 1/year) into the actual cash flow accrued over the period
 vega = B_pay * delta * L * sqrt(tau) * normpdf(d1);  % Black vega of the underlying caplet   
 
 price = price_black - dsigma_dK * vega;  % Smile correction (call-spread slope effect)
