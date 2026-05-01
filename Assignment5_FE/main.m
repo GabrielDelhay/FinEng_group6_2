@@ -124,9 +124,9 @@ fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
 % Bucket 1: 0-2y  -> Depos (1:3) + Futures (1:7) + Swap_2 (swap idx 2)
 % Bucket 2: 2-6y  -> Swaps from ~2y to 6y (swap idx 3:6)
 % Bucket 3: 6-10y -> Swaps from ~6y to 10y (swap idx 7:10)
-[~, ~, X_flat_base, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, fwd_rates, cap_maturity_idx, spot_vols, strikes);
-true_price = X_flat_base * N;
-bucket_delta = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures);
+
+
+bucket_delta = coarse_bucket_delta(T_delta.PV01_EUR, n_depos, n_futures);
 
 fprintf(['\n=== Coarse-Grained Bucket Deltas ===\n', 'Bucket 0-2y  : %10.2f EUR\n', 'Bucket 2-6y  : %10.2f EUR\n', ...
          'Bucket 6-10y : %10.2f EUR\n','Total        : %10.2f EUR\n'], bucket_delta(1), bucket_delta(2), bucket_delta(3), sum(bucket_delta));
