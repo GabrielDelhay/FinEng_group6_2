@@ -85,74 +85,19 @@ fprintf('\n--- Digital risk size ---\n');
 fprintf('Delta upfront X                : %10.4f bp\n',   (X_smile - X_flat)*1e4);
 
 %% EXERCISE 1.c
+
 BPV = 0.0001;
-n_depos = 3;
+n_depos   = 3;
 n_futures = 7;
-n_swaps = 50;
-n_total = n_depos + n_futures + (n_swaps - 1);
+n_swaps   = 15;
+n_total   = n_depos + n_futures + (n_swaps - 1);
 
-% Pre-allocate price vector
-price = zeros(n_total, 1);
 
-% Compute initial true_price (Baseline) in EUR
-[~, ~, X_flat_base, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, fwd_rates, cap_maturity_idx, spot_vols, strikes);
-true_price = X_flat_base * N;
-
-idx = 1; 
-
-% 1. Bump Depos
-for i = 1:n_depos
-    ratesSet.depos(i, :) = ratesSet.depos(i, :) + BPV;  % Bump
-    [dates, disc_bump, ~] = bootstrap(datesSet, ratesSet);
-    
-    % Recompute curve-dependent variables (forwards, spot vols)
-    [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
-        lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
-    
-    % Recompute price and extract new Upfront
-    [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
-    price(idx) = X_flat_bump * N;
-    
-    ratesSet.depos(i, :) = ratesSet.depos(i, :) - BPV;  % Restore
-    idx = idx + 1;
-end
-
-% 2. Bump Futures
-for i = 1:n_futures
-    ratesSet.futures(i, :) = ratesSet.futures(i, :) + BPV; 
-    [dates, disc_bump, ~] = bootstrap(datesSet, ratesSet);
-    
-    [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
-        lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
-        
-    [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
-    price(idx) = X_flat_bump * N;
-    
-    ratesSet.futures(i, :) = ratesSet.futures(i, :) - BPV;
-    idx = idx + 1;
-end
-
-% 3. Bump Swaps (skip the first)
-for i = 2:n_swaps
-    ratesSet.swaps(i, :) = ratesSet.swaps(i, :) + BPV; 
-    [dates, disc_bump, ~] = bootstrap(datesSet, ratesSet);
-    
-    [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
-        lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
-        
-    [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
-    price(idx) = X_flat_bump * N;
-    
-    ratesSet.swaps(i, :) = ratesSet.swaps(i, :) - BPV; 
-    idx = idx + 1;
-end
-
-% Vectorized delta calculation
-delta = price - true_price;
+true_price = X_flat * N;
+% Calculate all Delta Buckets using the new function
+[delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesSet, flat_vols, strikes, maturities, t0, true_price,n_depos, n_futures, n_swaps, n_total, BPV);
 
 %% Display results
-labels = [strcat("Depo_", string(1:n_depos)), strcat("Future_", string(1:n_futures)), strcat("Swap_", string(2:15))].';
-T_delta = table(labels, delta(1:length(labels)), 'VariableNames', {'Pillar', 'PV01_EUR'});
 fprintf('\n=== Delta Bucket Analysis (PV01) ===\n');
 disp(T_delta);
 fprintf('Total Delta (Sum of Buckets): %.2f EUR\n', sum(delta));
