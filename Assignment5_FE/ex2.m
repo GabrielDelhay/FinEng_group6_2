@@ -1,5 +1,6 @@
 %% Exotic Cap - Calibration & Pricing under Bond Market Model (BMM)
 
+clc; close all; clear all;
 %% 1. Bootstrap
 formatDate = 'dd/mm/yyyy';
 [datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
@@ -17,16 +18,16 @@ for i = 1:N
 end
 
 delta    = yearfrac(resetDates(1:end-1), resetDates(2:end), 3); % Act/365
-discGrid = linearRateInterp(dates, discounts, t0, resetDates); 
-L0       = (discGrid(1:end-1) ./ discGrid(2:end) - 1) ./ delta;
+B0_T = linearRateInterp(dates, discounts, t0, resetDates); 
+L0       = (B0_T(1:end-1) ./ B0_T(2:end) - 1) ./ delta;
 
 %% 3. ATM strikes: forward swap rate for each cap maturity
 maturitiesYears = [1, 2, 3, 4];
 K_ATM = zeros(1, 4);
 for m = 1:4
     nQ      = 4 * m;
-    B_Tm    = discGrid(nQ + 1);
-    BPV     = sum(delta(1:nQ) .* discGrid(2:nQ+1));
+    B_Tm    = B0_T(nQ + 1);
+    BPV     = sum(delta(1:nQ) .* B0_T(2:nQ+1));
     K_ATM(m) = (1 - B_Tm) / BPV;
 end
 
@@ -46,142 +47,72 @@ for m = 1:4
 end
 
 %% Spot vol bootstrap (BMM, single strike K_i = L0(i) per caplet)
-
-% Pre-allocate
-nu = zeros(1, 15);
-
-% --- 1Y bucket : 3 caplets (T1, T2, T3)
-fv_1Y = interp1(maturitiesYears, flatVolsATM_annual, ...
-                yearfrac(t0, resetDates(5), 3), 'linear', 'extrap');
-for i = 1:3
-    nu(i) = fv_1Y;
-end
-
-% Initial state
-sigma_alpha = fv_1Y;
-
-% Price of caplets already bootstrapped (1Y bucket)
-cap_price_already = 0;
-for i = 1:3
-    cap_price_already = cap_price_already + ...
-        capletBMM_strike(nu(i), discGrid(i+2), delta(i+1), L0(i+1), ...
-                         L0(i+1), yearfrac(t0, resetDates(i+1), 3));
-end
-
-% --- Buckets 2Y, 3Y, 4Y 
-for k = 2:4
-    i_alpha = (k-1)*4;          
-    i_beta  = min(k*4 - 1, 15); 
-
-    % Flat vol du cap kY interpolée à la maturité du cap (dernier paiement T_{4k})
-    mat_beta  = yearfrac(t0, resetDates(4*k + 1), 3);
-    fv_beta   = interp1(maturitiesYears, flatVolsATM_annual, mat_beta, ...
-                        'linear', 'extrap');
-
-    % Prix du cap kY complet avec vol plate fv_beta sur tous les caplets
-    cap_price_flat = 0;
-    for i = 1:i_beta
-        vol_i = fv_beta;  % flat vol for all caplets of this cap
-        cap_price_flat = cap_price_flat + ...
-            capletBMM_strike(vol_i, discGrid(i+2), delta(i+1), L0(i+1), ...
-                             L0(i+1), yearfrac(t0, resetDates(i+1), 3));
-    end
-
-    % Incremental price for new caplets only
-    delta_cap_price = cap_price_flat - cap_price_already;
-
-    % Boundary reset dates for linear interpolation (like their code)
-    T_alpha = resetDates(i_alpha);    % reset date left boundary
-    T_beta  = resetDates(i_beta+1);  % reset date right boundary
-
-    % fzero: find sigma_beta such that new caplets (linear vol) = delta_cap_price
-    f = @(sb) segmentPriceBMM_dates(sb, sigma_alpha, i_alpha, i_beta, ...
-                                     discGrid, delta, L0, resetDates, t0, ...
-                                     T_alpha, T_beta) - delta_cap_price;
-
-    sigma_beta = fzero(f, fv_beta);
-
-    % Store spot vols with linear interpolation on reset dates
-    for i = i_alpha:i_beta
-        w     = (resetDates(i+1) - T_alpha) / (T_beta - T_alpha);
-        nu(i) = sigma_alpha + w * (sigma_beta - sigma_alpha);
-    end
-
-    % Update state
-    sigma_alpha       = sigma_beta;
-    cap_price_already = cap_price_flat;
-end
-
-
+nu = spotvolbootstrap(maturitiesYears, flatVolsATM_annual, t0, resetDates, B0_T, delta, L0);
 
 %% 6. Correlation matrix rho_{ij} = exp(-lambda * |T_i - T_j|)
 lambda = 0.1;
-tGrid  = yearfrac(t0, resetDates(2:end), 3); % T_1..T_16, size 16
+tGrid  = yearfrac(t0, resetDates(2:end), 3); % T_1..T_16
 RHO    = exp(-lambda * abs(tGrid' - tGrid));  % 16x16
 C      = chol(RHO, 'lower');
 
-%% 7. Monte Carlo under spot measure
-% B_i(t) is lognormal; chain advances reset date by reset date.
-% Stochastic discount: D(t0, T_{k+1}) = prod_{j=0}^{k} B_j(T_j) accumulated along path.
+%% 7. Monte Carlo under Spot Measure (Bond Market Model)
 
 Nsim    = 100000;
-payoffs = zeros(Nsim, 1);
+payoffs = zeros(Nsim,1);
+
 
 for sim = 1:Nsim
-
-    % Initial forward bond values: B_i(t0) = disc(T_i)/disc(T_{i+1})
-    B_sim = discGrid(1:end-1) ./ discGrid(2:end); % size 16
-
-    % Stochastic discount factor accumulated along the path
-    stochDisc = 1.0;
+    % B_sim(i) = P(t0,T_i)/P(t0,T_{i-1}) < 1, i=1..16 (forward discount factor)
+    B_sim = B0_T(2:end) ./ B0_T(1:end-1);
+    fixedLibors = zeros(1, N);
+    fixedLibors(1) = L0(1);  % L_1 known at t0 (deterministic)
+    cumDiscount = 1.0;
 
     for k = 0:N-1
-        dt    = delta(k+1);
-        Z_cor = C * randn(N, 1);
+        dt    = delta(k+1);            % time step [T_k, T_{k+1}]
+        Z     = randn(N, 1);
+        dW    = sqrt(dt) * (C * Z);    % correlated Brownian increments (16 x 1)
+        B_old = B_sim;
 
-        % Update all bonds not yet fixed (i >= k+2)
+        % Evolve forward bonds B_{k+2},...,B_N from T_k to T_{k+1}.
+        % Bond B_i = P(t,T_i)/P(t,T_{i-1}), vol nu(i-1), noise dW(i-1).
         for i = k+2:N
-            nu_i = nu(min(i-1, 15));
-
-            % Convexity drift under spot measure: -sum_{j=k+1}^{i-1} rho_{ij}*nu_j*nu_i*dt
-            drift_i = 0;
+            nu_i  = nu(i-1);
+            % Spot-measure convexity drift: -nu_i * sum_{j=k+2}^{i-1} rho_{ij}*nu_j
+            drift = 0.0;
             for j = k+2:i-1
-                nu_j    = nu(min(j-1, 15));
-                drift_i = drift_i - RHO(i,j) * nu_j * nu_i * dt;
+                nu_j  = nu(j-1);
+                drift = drift - RHO(i-1, j-1) * nu_i * nu_j;
             end
-
-            B_sim(i) = B_sim(i) * exp(drift_i - 0.5*nu_i^2*dt + nu_i*sqrt(dt)*Z_cor(i));
+            B_sim(i) = B_old(i) * exp((drift - 0.5*nu_i^2)*dt - nu_i*dW(i-1));
         end
 
-        % Accumulate stochastic discount: multiply by B_{k+1}(T_k) just fixed
-        stochDisc = stochDisc * B_sim(k+1);
+        % Fix L_{k+2} at T_{k+1}: spot Libor for period [T_{k+1}, T_{k+2}]
+        if k <= N-2
+            fixedLibors(k+2) = (1/B_sim(k+2) - 1) / delta(k+2);
+        end
 
-        % Exotic caplet payoff: fixing at T_k, payment at T_{k+2}
-        % First payment at 6M => k >= 1, last fixing at T_15 => k <= 14
-        if k >= 1 && k <= 14
-            i_curr = k + 1;
-            i_prev = k;
+        % Accumulate path discount factor: D(t0, T_{k+1}) = prod_{j=0}^{k} P(T_j, T_{j+1})
+        cumDiscount = cumDiscount * B_old(k+1);
 
-            L_curr = (B_sim(i_curr) - 1) / delta(i_curr);
-            L_prev = (B_sim(i_prev) - 1) / delta(i_prev);
-
-            payoff_k = delta(i_curr) * max(L_curr - L_prev - 0.0005, 0);
-
-            % Discount to t0: payment at T_{k+2} => divide by one more bond
-            disc_to_payment = stochDisc * B_sim(i_curr+1);
-            payoffs(sim)    = payoffs(sim) + payoff_k / disc_to_payment;
+        % Exotic caplet payoff at T_{k+2}:
+        %   delta_{k+1} * max( L_{k+1}(T_k) - L_k(T_{k-1}) - spread, 0 )
+        % First payment at T_3 (k=1), last at T_16 (k=14).
+        if k >= 1 && k <= N-2
+            L_prev = fixedLibors(k);    % L_k fixed at T_{k-1}
+            L_curr = fixedLibors(k+1);  % L_{k+1} fixed at T_k
+            payoff = delta(k+1) * max(L_curr - L_prev - 0.0005, 0.0);
+            % Discount from T_{k+2} to t0: cumDiscount*B_sim(k+2) = P(t0,T_{k+2})
+            pv = cumDiscount * B_sim(k+2) * payoff;
+            payoffs(sim) = payoffs(sim) + pv;
         end
     end
 end
 
 %% 8. Results
-price    = mean(payoffs);
-std_err  = std(payoffs) / sqrt(Nsim);
+price   = mean(payoffs);
+std_err = std(payoffs)/sqrt(Nsim);
 
-fprintf('Exotic Cap price (BMM): %.6f\n', price);
-fprintf('Standard error:         %.6f\n', std_err);
-fprintf('95%% CI: [%.6f, %.6f]\n', price - 1.96*std_err, price + 1.96*std_err);
-
-
-
-
+fprintf('Exotic Cap price (BMM): %.8f\n', price);
+fprintf('Standard error:         %.8f\n', std_err);
+fprintf('95%% CI: [%.8f, %.8f]\n', price - 1.96*std_err, price + 1.96*std_err);
