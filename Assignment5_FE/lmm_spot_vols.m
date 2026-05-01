@@ -35,7 +35,7 @@ n_maturities = length(maturities);
 % Raw quarterly dates from t0+3m up to t0+20Y, then Mod Following adjustment.
 n_quarters = 4 * 20;
 raw_dates  = arrayfun(@(q) addtodate(t0, 3*q, 'month'), (1:n_quarters)');
-cap_dates  = adj_modfollow(raw_dates);
+cap_dates  = busdate(raw_dates, 'modifiedfollow');
 
 %% SECTION 2: Discount factors and forward rates on the caplet schedule
 B_cap = linearRateInterp(dates, discounts, t0, cap_dates);
@@ -52,7 +52,7 @@ fwd_rates = (B_Ti ./ B_Ti1 - 1) ./ delta_fwd;
 
 %% SECTION 3: Map cap maturities to caplet indices
 raw_targets  = arrayfun(@(y) addtodate(t0, y, 'year'), maturities(:));
-target_dates = adj_modfollow(raw_targets);
+target_dates = busdate(raw_targets, 'modifiedfollow');
 
 [found, cap_maturity_idx] = ismember(target_dates, cap_dates);
 if ~all(found)

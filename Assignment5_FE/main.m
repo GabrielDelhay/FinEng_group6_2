@@ -126,12 +126,51 @@ fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
 % Bucket 3: 6-10y -> Swaps from ~6y to 10y (swap idx 7:10)
 
 
-bucket_delta = coarse_bucket_delta(T_delta.PV01_EUR, n_depos, n_futures);
-
+[bucket_delta, bucket_DF_bump] = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures);
 fprintf(['\n=== Coarse-Grained Bucket Deltas ===\n', 'Bucket 0-2y  : %10.2f EUR\n', 'Bucket 2-6y  : %10.2f EUR\n', ...
          'Bucket 6-10y : %10.2f EUR\n','Total        : %10.2f EUR\n'], bucket_delta(1), bucket_delta(2), bucket_delta(3), sum(bucket_delta));
 
-% MISSING HEDGING WITH SWAPS
+T_expiry = [datesSet.swaps(2); datesSet.swaps(6); datesSet.swaps(10)];
+n_buckets = 3;
+
+delta_swaps = zeros(n_buckets, n_buckets);
+for j = 1:n_buckets                 % loop over hedging swaps
+    for i = 1:n_buckets             % loop over coarse buckets
+        delta_swaps(i, j) = calc_swap_delta_exact(t0, T_expiry(j), dates, discounts, bucket_DF_bump(:, i));
+    end
+end
+
+% Matlab will recon it's a triangular back-substitution: longest swap first
+N_hedge = delta_swaps \ (-bucket_delta);       
+%% approximation
+% Coarse-grained bucket deltas
+[bucket_delta, bucket_DF_bump] = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures);
+
+fprintf(['\n=== Coarse-Grained Bucket Deltas ===\n', ...
+         'Bucket 0-2y  : %10.2f EUR\n', ...
+         'Bucket 2-6y  : %10.2f EUR\n', ...
+         'Bucket 6-10y : %10.2f EUR\n', ...
+         'Total        : %10.2f EUR\n'], ...
+         bucket_delta(1), bucket_delta(2), bucket_delta(3), sum(bucket_delta));
+
+T_expiry = [datesSet.swaps(2); datesSet.swaps(6); datesSet.swaps(10)];
+n_buckets = 3;
+delta_swaps = zeros(n_buckets, n_buckets);
+
+for j = 1:n_buckets                 % loop over hedging swaps
+    for i = 1:n_buckets             % loop over coarse buckets
+        % Usa l'approssimazione da trader invece dell'exact
+        delta_swaps(i, j) = calc_swap_delta_approx(t0, T_expiry(j), dates, discounts, bucket_DF_bump(:, i));
+    end
+end
+
+% Risoluzione del sistema per trovare i Nozionali di Hedging
+N_hedge = delta_swaps \ (-bucket_delta);
+
+fprintf('\n=== Hedging Notionals (EUR) ===\n');
+fprintf('Swap 2y  : %15.2f\n', N_hedge(1));
+fprintf('Swap 6y  : %15.2f\n', N_hedge(2));
+fprintf('Swap 10y : %15.2f\n', N_hedge(3));
 
 %% EXERCISE 1.f
 bucket_vega = coarse_bucket_vega(flat_vols, strikes, maturities, dates, discounts, ...
