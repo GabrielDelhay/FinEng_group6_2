@@ -154,7 +154,6 @@ fprintf('Total        : %.2f EUR\n', sum(bucket_vega));
 
 % 1. Calcolo la matrice dei Vega dei Cap
 vega_caps = calc_hedge_caps_vega(flat_vols, strikes, maturities, dates, discounts, t0, dVol, N);
-
 fprintf('\n=== Caps Vega Matrix ===\n');
 disp(array2table(vega_caps, 'VariableNames', {'Cap_6y', 'Cap_10y'}, 'RowNames', {'Bucket_0_6y', 'Bucket_6_10y'}));
 
