@@ -1,6 +1,6 @@
 function bucket_vega = coarse_bucket_vega(flat_vols, strikes, maturities, dates, discounts, ...
                                            t0, N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                                           fwd_rates, cap_maturity_idx, spot_vols, true_price, dVol)
+                                           fwd_rates, cap_maturity_idx, dVol)
 % coarse_bucket_vega  Bucketed vega (0-6y and 6-10y) by bumping flat_vols columns.
 %
 %   Bucket 1: 0-6y  -> maturities 1,2,3,4,5,6  -> columns 1:6
