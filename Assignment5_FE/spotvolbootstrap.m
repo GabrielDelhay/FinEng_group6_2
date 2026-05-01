@@ -1,81 +1,154 @@
 function nu = spotvolbootstrap(maturitiesYears, flatVolsATM_annual, t0, ...
                                resetDates, B0_T, delta, L0)
-    nu = zeros(1, 15);
 
-    %% Prix marché des caps via Black LMM avec strike individuel K_i = L0(i+1)
-    % A l'ATM: K_i = L0(i+1) => log(L0/K)=0 => d1 = 0.5*sigma*sqrt(T)
-    capPriceMarket = zeros(1, 4);
+    % Number of forward rates / caplets
+    nCaplets = 15;
+
+    % Output vector
+    nu = zeros(1, nCaplets);
+
+    % Market cap prices from ATM Black formula
+    %
+    % For ATM caplets:
+    %   K_i = L0(i+1)
+    % therefore:
+    %   d1 = +0.5 * sigma * sqrt(T)
+    %   d2 = -0.5 * sigma * sqrt(T)
+    %
+    % Cap maturities: 1Y, 2Y, 3Y, 4Y
+
+
+    capPriceMarket = zeros(1,4);
+
     for m = 1:4
+
         nQ = 4 * m;
-        for i = 1:nQ-1  % caplets stochastiques: i=1..nQ-1
-            Ti_t0 = yearfrac(t0, resetDates(i+2), 3);  % fixing en T_{i+1}
-            % Vol flat interpolée à la maturité du cap (pas du caplet)
-            fv_m  = interp1(maturitiesYears, flatVolsATM_annual, ...
-                            yearfrac(t0, resetDates(nQ+1), 3), ...
-                            'linear', 'extrap');
-            % ATM exact: d1 = +0.5*fv*sqrt(T), d2 = -0.5*fv*sqrt(T)
-            d1 = 0.5 * fv_m * sqrt(Ti_t0);
-            d2 = -d1;
-            % K_i = L0(i+1), donc L0(i+1)*N(d1) - K_i*N(d2) = L0(i+1)*(N(d1)-N(d2))
-            capPriceMarket(m) = capPriceMarket(m) + ...
-                B0_T(i+2) * delta(i+1) * L0(i+1) * (normcdf(d1) - normcdf(d2));
-        end
+
+        % Caplet indices contributing to the cap
+        idx = 1:(nQ-1);
+
+        % Fixing times T_{i+1}
+        Ti = yearfrac(t0, resetDates(idx+2), 3);
+
+        % Flat ATM volatility associated with the cap maturity
+        capMat = yearfrac(t0, resetDates(nQ+1), 3);
+
+        fv = interp1(maturitiesYears, ...
+                     flatVolsATM_annual, ...
+                     capMat, ...
+                     'linear', ...
+                     'extrap');
+
+        % ATM Black quantities
+        d1 = 0.5 * fv .* sqrt(Ti);
+        d2 = -d1;
+
+        % Vectorized cap price
+        capPriceMarket(m) = sum( ...
+            B0_T(idx+2) .* ...
+            delta(idx+1) .* ...
+            L0(idx+1) .* ...
+            (normcdf(d1) - normcdf(d2)) ...
+        );
 
     end
 
-    %% Bootstrap BMM bucket 1Y : caplets i=1,2,3 (fixing T2,T3,T4)
-    % nu constant sur ce bucket, strike K_i = L0(i+1) par caplet
+    % Bootstrap first bucket (1Y)
+    %
+    % Constant instantaneous volatility over the first bucket:
+    %   nu(1:3) = constant
+
     target_1Y = capPriceMarket(1);
 
-    f1 = @(nu_cst) sum(arrayfun(@(i) ...
-        capletBMM_strike_ATM(nu_cst, B0_T(i+2), delta(i+1), L0(i+1), ...
-                             yearfrac(t0, resetDates(i+2), 3)), ...
-        1:3)) - target_1Y;
+    idx1 = 1:3;
+
+    f1 = @(nu_cst) ...
+        sum( ...
+            arrayfun(@(i) ...
+                capletBMM_strike_ATM( ...
+                    nu_cst, ...
+                    B0_T(i+2), ...
+                    delta(i+1), ...
+                    L0(i+1), ...
+                    yearfrac(t0, resetDates(i+2), 3)), ...
+                idx1)) ...
+        - target_1Y;
 
     nu_1Y = fzero(f1, 0.002);
-    nu(1:3) = nu_1Y;
+
+    nu(idx1) = nu_1Y;
+
     sigma_alpha = nu_1Y;
 
-    % Prix déjà bootstrappé (bucket 1Y)
-    cap_price_already = sum(arrayfun(@(i) ...
-        capletBMM_strike_ATM(nu(i), B0_T(i+2), delta(i+1), L0(i+1), ...
-                             yearfrac(t0, resetDates(i+2), 3)), ...
-        1:3));
+    % Price already explained by calibrated buckets
+    cap_price_already = sum( ...
+        arrayfun(@(i) ...
+            capletBMM_strike_ATM( ...
+                nu(i), ...
+                B0_T(i+2), ...
+                delta(i+1), ...
+                L0(i+1), ...
+                yearfrac(t0, resetDates(i+2), 3)), ...
+            idx1));
 
-    %% Bootstrap BMM buckets 2Y, 3Y, 4Y
+    % Bootstrap remaining buckets: 2Y, 3Y, 4Y
+    %
+    % Volatility is linearly interpolated between:
+    %   sigma_alpha -> sigma_beta
+
     for k = 2:4
-        i_alpha = (k-1)*4;          % premier caplet du bucket
-        i_beta  = min(k*4-1, 15);   % dernier caplet du bucket
-        T_alpha = resetDates(i_alpha+1);
-        T_beta  = resetDates(i_beta+1);
 
-        % Prix du cap kY complet en BMM avec interp linéaire de nu
-        % = cap_price_already (buckets précédents) + nouveaux caplets
-        f = @(sb) cap_price_already + ...
-            priceBMM_segment(sb, sigma_alpha, i_alpha, i_beta, ...
-                             B0_T, delta, L0, resetDates, t0, ...
-                             T_alpha, T_beta) ...
+        % Bucket boundaries
+        i_alpha = (k-1) * 4;
+        i_beta  = min(k * 4 - 1, nCaplets);
+
+        idx = i_alpha:i_beta;
+
+        T_alpha = resetDates(i_alpha + 1);
+        T_beta  = resetDates(i_beta  + 1);
+
+        % Objective function:
+        % previously calibrated price
+        % + contribution of current bucket
+        f = @(sigma_beta) ...
+            cap_price_already + ...
+            priceBMM_segment( ...
+                sigma_beta, ...
+                sigma_alpha, ...
+                i_alpha, ...
+                i_beta, ...
+                B0_T, ...
+                delta, ...
+                L0, ...
+                resetDates, ...
+                t0, ...
+                T_alpha, ...
+                T_beta) ...
             - capPriceMarket(k);
 
-        % Point de départ: conversion approx LMM->BMM
-        nu_init = flatVolsATM_annual(k) * ...
-            mean((delta(i_alpha:i_beta) .* L0(i_alpha+1:i_beta+1)) ./ ...
-                 (1 + delta(i_alpha:i_beta) .* L0(i_alpha+1:i_beta+1)));
+        % Initial guess:
+        % approximate conversion LMM -> BMM
+        weights = (delta(idx) .* L0(idx+1)) ./ ...
+                  (1 + delta(idx) .* L0(idx+1));
+
+        nu_init = flatVolsATM_annual(k) * mean(weights);
 
         sigma_beta = fzero(f, nu_init);
 
-        % Stockage avec interpolation linéaire sur les dates de reset
-        for i = i_alpha:i_beta
-            w     = (resetDates(i+1) - T_alpha) / (T_beta - T_alpha);
-            nu(i) = sigma_alpha + w * (sigma_beta - sigma_alpha);
-        end
+        % Linear interpolation inside the bucket
+        w = (resetDates(idx+1) - T_alpha) ./ (T_beta - T_alpha);
 
-        % Mise à jour pour le bucket suivant
+        nu(idx) = sigma_alpha + w .* (sigma_beta - sigma_alpha);
+
+        % Prepare next bucket
         sigma_alpha       = sigma_beta;
         cap_price_already = capPriceMarket(k);
+
     end
 
-    fprintf('\nnu bootstrapped (BMM, indiv ATM strikes):\n');
+    %% Display calibrated spot volatilities
+
+    fprintf('\nBootstrapped instantaneous volatilities (BMM):\n');
     disp(nu);
 
 end
