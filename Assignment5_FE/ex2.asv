@@ -50,35 +50,47 @@ end
 % Pre-allocate
 nu = zeros(1, 15);
 
-% --- 1Y bucket : 3 caplets (T1, T2, T3)
+% --- 1Y bucket: all caplets share the 1Y flat vol ---
 fv_1Y = interp1(maturitiesYears, flatVolsATM_annual, ...
                 yearfrac(t0, resetDates(5), 3), 'linear', 'extrap');
-for i = 1:3
+for i = 1:4
     nu(i) = fv_1Y;
 end
 
 % Initial state
 sigma_alpha = fv_1Y;
+i_alpha_prev = 1;
 
 % Price of caplets already bootstrapped (1Y bucket)
 cap_price_already = 0;
-for i = 1:3
+for i = 1:4
     cap_price_already = cap_price_already + ...
         capletBMM_strike(nu(i), discGrid(i+2), delta(i+1), L0(i+1), ...
                          L0(i+1), yearfrac(t0, resetDates(i+1), 3));
 end
 
-% --- Buckets 2Y, 3Y, 4Y 
+% --- Buckets 2Y, 3Y, 4Y ---
 for k = 2:4
-    i_alpha = (k-1)*4;          
-    i_beta  = min(k*4 - 1, 15); 
+    i_alpha = (k-1)*4 + 1;   % first new caplet in this bucket
+    i_beta  = min(k*4, 15);  % last caplet of this cap
 
-    % Flat vol du cap kY interpolée à la maturité du cap (dernier paiement T_{4k})
-    mat_beta  = yearfrac(t0, resetDates(4*k + 1), 3);
+    % Flat vol of cap(kY) read at swap rate strike
+    mat_beta  = yearfrac(t0, resetDates(i_beta+1), 3);
     fv_beta   = interp1(maturitiesYears, flatVolsATM_annual, mat_beta, ...
                         'linear', 'extrap');
 
-    % Prix du cap kY complet avec vol plate fv_beta sur tous les caplets
+    % Market cap price at kY with flat vol fv_beta
+    % Each caplet priced at its own strike K_i = L0(i+1)
+    cap_price_flat = cap_price_already;
+    for i = 1:i_beta
+        ni = nu(i);  % already bootstrapped for i < i_alpha
+        if i >= i_alpha
+            ni = fv_beta;  % flat vol for new caplets (temporary)
+        end
+        cap_price_flat = cap_price_flat + 0; % recompute below
+    end
+
+    % Recompute full cap price at kY using flat vol for ALL caplets
     cap_price_flat = 0;
     for i = 1:i_beta
         vol_i = fv_beta;  % flat vol for all caplets of this cap
@@ -113,6 +125,40 @@ for k = 2:4
 end
 
 
+% %% 5. Bootstrap spot vols nu_i from flat vols (linear constraint between annual maturities)
+% % Between two annual maturities, nu_i is linearly interpolated.
+% % One unknown per annual segment: nu at the right boundary (nu_left fixed from previous).
+% 
+% nu      = zeros(1, 15);
+% nu_left = interp1(maturitiesYears, flatVolsATM_annual, ...
+%                   yearfrac(t0, resetDates(2), 3), 'linear', 'extrap');
+% 
+% for k = 1:4
+%     i_left  = (k-1)*4 + 1;
+%     i_right = min(k*4, 15);
+% 
+%     mat_right = yearfrac(t0, resetDates(i_right+1), 3);
+%     mat_left  = yearfrac(t0, resetDates(i_left), 3);
+%     fv_right  = interp1(maturitiesYears, flatVolsATM_annual, mat_right, 'linear','extrap');
+%     fv_left   = interp1(maturitiesYears, flatVolsATM_annual, mat_left,  'linear','extrap');
+% 
+%     price_right = capPriceBMM_flat(fv_right, discGrid, delta, L0, resetDates, t0, i_right);
+%     if k == 1
+%         price_target = price_right;
+%     else
+%         price_left   = capPriceBMM_flat(fv_left, discGrid, delta, L0, resetDates, t0, i_left-1);
+%         price_target = price_right - price_left;
+%     end
+% 
+%     obj          = @(nu_r) segmentPrice(nu_r, nu_left, i_left, i_right, ...
+%                                         discGrid, delta, L0, resetDates, t0) - price_target;
+%     nu_right_sol = fzero(obj, fv_right);
+% 
+%     for i = i_left:i_right
+%         nu(i) = nu_left + (i - i_left) / (i_right - i_left + 1) * (nu_right_sol - nu_left);
+%     end
+%     nu_left = nu_right_sol;
+% end
 
 %% 6. Correlation matrix rho_{ij} = exp(-lambda * |T_i - T_j|)
 lambda = 0.1;
@@ -162,8 +208,8 @@ for sim = 1:Nsim
             i_curr = k + 1;
             i_prev = k;
 
-            L_curr = (B_sim(i_curr) - 1) / delta(i_curr);
-            L_prev = (B_sim(i_prev) - 1) / delta(i_prev);
+            L_curr = (1/B_sim(i_curr) - 1) / delta(i_curr);
+            L_prev = (1/B_sim(i_prev) - 1) / delta(i_prev);
 
             payoff_k = delta(i_curr) * max(L_curr - L_prev - 0.0005, 0);
 
