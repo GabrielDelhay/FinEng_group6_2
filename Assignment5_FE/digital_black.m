@@ -13,5 +13,5 @@ function price = digital_black(L, K, delta, B_pay, tau, sigma)
 vol_sqrt_T = sigma .* sqrt(tau);
 d2 = (log(L./K) - 0.5 .* sigma.^2 .* tau) ./ vol_sqrt_T;
 
-price = B_pay .* delta .* normcdf(d2);
+price = B_pay .* delta .* normcdf(d2);   % The extra delta turns the annualized digital coupon c_dig (a rate, 1/year) into the actual cash flow accrued over the period
 end
