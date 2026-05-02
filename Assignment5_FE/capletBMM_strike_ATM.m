@@ -1,10 +1,13 @@
-% BMM ATM caplet price. At-the-money (K = Li1) exact simplification.
 function price = capletBMM_strike_ATM(nu, Bi2, di1, Li1, Ti_t0)
+% Prices a single BMM caplet at ATM strike K = Li1 using the closed-form
+% simplification d1 = 0.5*nu*sqrt(T), d2 = -d1.
+%Inputs :
     % nu    : BMM spot vol for this caplet (vol of log forward bond)
     % Bi2   : B0_T(i+2) = P(t0, T_{i+1}), discount to payment date T_{i+1}
     % di1   : delta(i+1), year fraction of the accrual period [T_i, T_{i+1}]
     % Li1   : L0(i+1), ATM forward Libor = strike
     % Ti_t0 : yearfrac(t0, T_{i+1}), time used for vol scaling (consistent with bootstrap)
+    
     if nu * sqrt(Ti_t0) < 1e-10
         price = 0; return
     end

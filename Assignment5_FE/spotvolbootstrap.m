@@ -1,5 +1,16 @@
 function nu = spotvolbootstrap(maturitiesYears, flatVolsATM_annual, t0, ...
                                resetDates, B0_T, delta, L0)
+% Bootstraps BMM spot vols nu(1..15) from flat Black cap vols by bucket
+% (1Y,2Y,3Y,4Y), matching market cap prices. Within each annual bucket,
+% nu is linearly interpolated between the boundary vols.
+
+% Inputs: maturitiesYears, 
+%         flatVolsATM_annual, 
+%         t0, 
+%         resetDates,
+%         B0_T, 
+%         delta, 
+%         L0
 
     % Number of forward rates / caplets
     nCaplets = 15;
