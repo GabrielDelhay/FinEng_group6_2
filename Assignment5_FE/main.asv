@@ -28,7 +28,7 @@ flat_vols = [
 
 flat_vols = flat_vols / 100;   % -> convert vols to decimals
 formatDate = 'dd/mm/yyyy';
-[datesSet, ratesSet] = readExcelData('MktData_CurveBootstrap.xls', formatDate);
+[datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
 [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
 t0 = dates(1);  % Settlement date: 19/02/2008
 
@@ -166,8 +166,7 @@ fprintf('Notional Cap 6y  : %.2f\n', N_hedge_vega(1));
 fprintf('Notional Cap 10y : %.2f\n', N_hedge_vega(2));
 
 %% Case study 2 : Exotic Cap - Calibration & Pricing under Bond Market Model (BMM)
-fprintf('\n=== Exercice 2 ===\n');
-
+fprintf('\n=== Vega Hedging Notionals (EUR) ===\n');
 %% 1. Bootstrap
 formatDate = 'dd/mm/yyyy';
 [datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
