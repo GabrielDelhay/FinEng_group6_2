@@ -103,7 +103,7 @@ disp(T_delta);
 fprintf('Total Delta (Sum of Buckets): %.2f EUR\n', sum(delta));
 %% EXERCISE 1.d
 % Total vega
-dVol = 0.0001;
+dVol = 0.01;
 flat_vols_up = flat_vols + dVol;
 [spot_vols_up, ~, ~, ~, ~, ~, ~, ~] = ...
 lmm_spot_vols(flat_vols_up, strikes, maturities, dates, discounts, t0);
@@ -144,8 +144,8 @@ end
 N_hedge_delta = delta_swaps \ (-bucket_delta);       
 %% EXERCISE 1.f
 bucket_vega = coarse_bucket_vega(flat_vols, strikes, maturities, dates, discounts, ...
-    t0, N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-    fwd_rates, cap_maturity_idx, dVol, cap_dates);
+                                           t0, N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
+                                           fwd_rates, cap_maturity_idx, dVol,cap_dates);
 
 fprintf('\n=== Coarse-Grained Bucket Vegas ===\n');
 fprintf('Bucket 0-6y  : %.2f EUR\n', bucket_vega(1));
