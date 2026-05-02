@@ -69,7 +69,7 @@ bond.spread3   = 0.0130;   bond.K3 = 0.0540;   bond.c_dig3 = 0.0110;  % Regime 3
 %% Calculate pricing (Flat Black and Smile-corrected)
 [NPV_A, NPV_B_flat, X_flat, NPV_B_smile, X_smile] = ...
     price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                          fwd_rates, cap_maturity_idx, spot_vols, strikes);
+                          fwd_rates, cap_maturity_idx, spot_vols, strikes, cap_dates, t0);
 %% Output
 fprintf('\n=== Pricing of the structured bond ===\n');
 fprintf('NPV Party A (floating)         : %14.2f EUR\n',  NPV_A);
@@ -95,7 +95,7 @@ n_total   = n_depos + n_futures + (n_swaps - 1);
 
 true_price = X_flat * N;
 % Calculate all Delta Buckets using the new function
-[delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesSet, flat_vols, strikes, maturities, t0, true_price,n_depos, n_futures, n_swaps, n_total, BPV);
+[delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesSet, flat_vols, strikes, maturities, t0, true_price,n_depos, n_futures, n_swaps, n_total, BPV, cap_dates);
 
 %% Display results
 fprintf('\n=== Delta Bucket Analysis (PV01) ===\n');
@@ -109,13 +109,13 @@ flat_vols_up = flat_vols + dVol;
 lmm_spot_vols(flat_vols_up, strikes, maturities, dates, discounts, t0);
 [~, ~, X_flat_up_vega, ~, ~] = ...
     price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                          fwd_rates, cap_maturity_idx, spot_vols_up, strikes);
+                          fwd_rates, cap_maturity_idx, spot_vols_up, strikes,cap_dates, t0);
 flat_vols_down = flat_vols - dVol;
 [spot_vols_down, ~, ~, ~, ~, ~, ~, ~] = ...
 lmm_spot_vols(flat_vols_down, strikes, maturities, dates, discounts, t0);
 [~, ~, X_flat_down_vega, ~, ~] = ...
     price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                          fwd_rates, cap_maturity_idx, spot_vols_down, strikes);
+                          fwd_rates, cap_maturity_idx, spot_vols_down, strikes, cap_dates, t0);
 vega_total_b = (X_flat_up_vega - X_flat_down_vega) * N /(2); 
 fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
 
@@ -126,7 +126,7 @@ fprintf('Total Vega (+1%% of flat vol): %.2f EUR\n', vega_total_b);
 % Bucket 3: 6-10y -> Swaps from ~6y to 10y (swap idx 7:10)
 
 
-[bucket_delta, bucket_DF_bump] = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures);
+[bucket_delta, bucket_DF_bump] = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures, cap_dates);
 fprintf(['\n=== Coarse-Grained Bucket Deltas ===\n', 'Bucket 0-2y  : %10.2f EUR\n', 'Bucket 2-6y  : %10.2f EUR\n', ...
          'Bucket 6-10y : %10.2f EUR\n','Total        : %10.2f EUR\n'], bucket_delta(1), bucket_delta(2), bucket_delta(3), sum(bucket_delta));
 
@@ -145,7 +145,7 @@ N_hedge_delta = delta_swaps \ (-bucket_delta);
 %% EXERCISE 1.f
 bucket_vega = coarse_bucket_vega(flat_vols, strikes, maturities, dates, discounts, ...
     t0, N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-    fwd_rates, cap_maturity_idx, dVol);
+    fwd_rates, cap_maturity_idx, dVol, cap_dates);
 
 fprintf('\n=== Coarse-Grained Bucket Vegas ===\n');
 fprintf('Bucket 0-6y  : %.2f EUR\n', bucket_vega(1));

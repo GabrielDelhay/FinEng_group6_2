@@ -1,4 +1,4 @@
-function [bucket_delta, bucket_DF_bump] = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures)
+function [bucket_delta, bucket_DF_bump] = coarse_bucket_delta(ratesSet, datesSet, dates, flat_vols, strikes, maturities, t0, N, spread, bond, true_price, BPV, n_depos, n_futures, cap_dates)
 bucket_delta = zeros(3, 1);
 bucket_DF_bump = zeros(length(dates), 3);
 % --- Bucket 1: 0-2y ---
@@ -11,7 +11,7 @@ ratesSet.swaps(2, :) = ratesSet.swaps(2, :) + BPV;
 bucket_DF_bump(:,1) = disc_bump;
 [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
     lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
-[~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+[~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes, cap_dates, t0);
 bucket_delta(:,1) = X_flat_bump * N - true_price;
 
 % Restore
@@ -26,7 +26,7 @@ ratesSet.swaps(3:6, :) = ratesSet.swaps(3:6, :) + BPV;
 bucket_DF_bump(:,2) = disc_bump;
 [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
     lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
-[~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+[~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes, cap_dates, t0);
 bucket_delta(2) = X_flat_bump * N - true_price;
 
 % Restore
@@ -39,7 +39,7 @@ ratesSet.swaps(7:10, :) = ratesSet.swaps(7:10, :) + BPV;
 bucket_DF_bump(:,3) = disc_bump;
 [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
     lmm_spot_vols(flat_vols, strikes, maturities, dates, disc_bump, t0);
-[~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+[~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes, cap_dates, t0);
 bucket_delta(3) = X_flat_bump * N - true_price;
 
 % Restore

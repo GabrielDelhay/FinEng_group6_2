@@ -1,4 +1,4 @@
-function [delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesSet, flat_vols, strikes, maturities, t0, true_price,n_depos, n_futures, n_swaps, n_total, BPV)
+function [delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesSet, flat_vols, strikes, maturities, t0, true_price,n_depos, n_futures, n_swaps, n_total, BPV, cap_dates)
 
     price = zeros(n_total, 1);
     idx = 1; 
@@ -12,7 +12,7 @@ function [delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesS
             lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
         
         % Extract X_flat (3rd output)
-        [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+        [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes, cap_dates, t0);
         price(idx) = X_flat_bump * N;
         
         ratesSet.depos(i, :) = ratesSet.depos(i, :) - BPV;  % Restore
@@ -27,7 +27,7 @@ function [delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesS
         [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
             lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
             
-        [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+        [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes, cap_dates, t0);
         price(idx) = X_flat_bump * N;
         
         ratesSet.futures(i, :) = ratesSet.futures(i, :) - BPV;
@@ -42,7 +42,7 @@ function [delta, T_delta] = calc_delta_buckets(N, spread, bond, datesSet, ratesS
         [spot_bump, ~, B_bump, fwd_bump, delta_bump, tau_bump, ~, idx_bump] = ...
             lmm_spot_vols(flat_vols, strikes, maturities, d_bump, disc_bump, t0);
             
-        [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes);
+        [~, ~, X_flat_bump, ~, ~] = price_structured_bond(N, spread, bond, B_bump, delta_bump, tau_bump, fwd_bump, idx_bump, spot_bump, strikes, cap_dates, t0);
         price(idx) = X_flat_bump * N;
         
         ratesSet.swaps(i, :) = ratesSet.swaps(i, :) - BPV; 

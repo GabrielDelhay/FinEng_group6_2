@@ -1,6 +1,6 @@
 function bucket_vega = coarse_bucket_vega(flat_vols, strikes, maturities, dates, discounts, ...
                                            t0, N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                                           fwd_rates, cap_maturity_idx, dVol)
+                                           fwd_rates, cap_maturity_idx, dVol, cap_dates)
 % coarse_bucket_vega  Bucketed vega (0-6y and 6-10y) by bumping flat_vols columns.
 %
 %   Bucket 1: 0-6y  -> maturities 1,2,3,4,5,6  -> columns 1:6
@@ -26,7 +26,7 @@ for b = 1:2
     [spot_vols_up, ~, ~, ~, ~, ~, ~, ~] = ...
         lmm_spot_vols(flat_vols_up, strikes, maturities, dates, discounts, t0);
     [~, ~, X_up, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                                                fwd_rates, cap_maturity_idx, spot_vols_up, strikes);
+                                                fwd_rates, cap_maturity_idx, spot_vols_up, strikes, cap_dates, t0);
 
     % --- Down bump ---
     flat_vols_down = flat_vols;
@@ -34,7 +34,7 @@ for b = 1:2
     [spot_vols_down, ~, ~, ~, ~, ~, ~, ~] = ...
         lmm_spot_vols(flat_vols_down, strikes, maturities, dates, discounts, t0);
     [~, ~, X_down, ~, ~] = price_structured_bond(N, spread, bond, B_cap, delta_fwd, tau_expiry, ...
-                                                  fwd_rates, cap_maturity_idx, spot_vols_down, strikes);
+                                                  fwd_rates, cap_maturity_idx, spot_vols_down, strikes, cap_dates, t0);
 
     % Central difference, scaled to +1% vol move (same convention as total vega)
     bucket_vega(b) = (X_up - X_down) * N * 100 / 2;
