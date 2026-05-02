@@ -152,13 +152,12 @@ fprintf('Bucket 0-6y  : %.2f EUR\n', bucket_vega(1));
 fprintf('Bucket 6-10y : %.2f EUR\n', bucket_vega(2));
 fprintf('Total        : %.2f EUR\n', sum(bucket_vega));
 
-% 1. Calcolo la matrice dei Vega dei Cap
+% Caps Vega Matrix
 vega_caps = calc_hedge_caps_vega(flat_vols, strikes, maturities, dates, discounts, t0, dVol, N);
 fprintf('\n=== Caps Vega Matrix ===\n');
 disp(array2table(vega_caps, 'VariableNames', {'Cap_6y', 'Cap_10y'}, 'RowNames', {'Bucket_0_6y', 'Bucket_6_10y'}));
 
-% 2. Risoluzione del sistema triangolare
-% (MATLAB usa lo 0 in basso a sinistra per risolvere dal 10y al 6y)
+% triangular system
 N_hedge_vega = vega_caps \ (-bucket_vega);
 
 fprintf('\n=== Vega Hedging Notionals (EUR) ===\n');
