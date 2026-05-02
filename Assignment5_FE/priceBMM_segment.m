@@ -1,8 +1,16 @@
-% Price caplets in segment [i_alpha, i_beta] with linearly interpolated BMM spot vol.
-% sa, sb : left and right vol boundaries for the segment
-% T_alpha, T_beta : reset dates at segment boundaries (used for linear interp weight)
 function p = priceBMM_segment(sb, sa, i_alpha, i_beta, B0_T, delta, L0, ...
                                resetDates, t0, T_alpha, T_beta)
+% Prices the caplets in index range [i_alpha, i_beta] using a BMM spot vol
+% linearly interpolated between sa (left boundary) and sb (right boundary).
+% Inputs: sb, sa (right/left vol boundaries), 
+%         i_alpha, i_beta (caplet indices),
+%         B0_T, 
+%         delta, 
+%         L0, 
+%         resetDates, 
+%         t0, 
+%         T_alpha, T_beta (boundary dates)
+
     p = 0;
     for i = i_alpha:i_beta
         % Linear interpolation weight in [0,1] across the segment

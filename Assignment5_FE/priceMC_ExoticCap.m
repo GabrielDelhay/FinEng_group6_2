@@ -1,4 +1,17 @@
 function payoffs = priceMC_ExoticCap(nu, B0_T, delta, L0, C, RHO, N, Nsim)
+% Simulates the exotic cap price under the spot measure via Monte Carlo.
+% Forward bonds follow log-normal dynamics with BMM spot vols nu and
+% exponential correlation structure encoded in C (Cholesky of RHO).
+
+% Inputs: nu (BMM spot vols, 1x15)
+%         B0_T (discount factors, 1x17),
+%         delta (year fractions, 1x16), 
+%         L0 (forward Libors, 1x16),
+%         C (Cholesky lower factor, 16x16), 
+%         RHO (correlation matrix, 16x16),
+%         N (number of periods), 
+%         Nsim (number of Monte Carlo paths) 
+
     nu_col      = nu(:);
     B_sim       = repmat((B0_T(2:end) ./ B0_T(1:end-1))', 1, Nsim);
     fixedLibors = zeros(N, Nsim);

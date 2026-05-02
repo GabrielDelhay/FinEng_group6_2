@@ -168,20 +168,14 @@ fprintf('Notional Cap 10y : %.2f\n', N_hedge_vega(2));
 %% Case study 2 : Exotic Cap - Calibration & Pricing under Bond Market Model (BMM)
 fprintf('\n=== Exercice 2 ===\n');
 
-%% 1. Bootstrap
-formatDate = 'dd/mm/yyyy';
-[datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
-[dates, discounts, ~] = bootstrap(datesSet, ratesSet);
-t0 = datesSet.settlement;
-
-%% 2. Market data
+%% 1. Market data
 N          = 16;
 resetDates = buildResetDates(t0, N);
 delta      = yearfrac(resetDates(1:end-1), resetDates(2:end), 3);
 B0_T       = linearRateInterp(dates, discounts, t0, resetDates);
 L0         = (B0_T(1:end-1) ./ B0_T(2:end) - 1) ./ delta;
 
-%% 3. Flat ATM vols from market table
+%% 2. Flat ATM vols from market table
 maturitiesYears = [1, 2, 3, 4];
 strikes_table   = [1.50,1.75,2.00,2.25,2.5,3.0,3.5,4.0,5.0,6.0,7.0,8.0,10.0] / 100;
 vols_table = [
@@ -192,16 +186,16 @@ vols_table = [
 ];
 flatVolsATM_annual = getATMFlatVols(B0_T, delta, maturitiesYears, strikes_table, vols_table);
 
-%% 4. BMM spot vol calibration
+%% 3. BMM spot vol calibration
 nu = spotvolbootstrap(maturitiesYears, flatVolsATM_annual, t0, resetDates, B0_T, delta, L0);
 
-%% 5. Correlation matrix rho_{ij} = exp(-lambda * |T_i - T_j|)
+%% 4. Correlation matrix rho_{ij} = exp(-lambda * |T_i - T_j|)
 lambda = 0.1;
 tGrid  = yearfrac(t0, resetDates(2:end), 3);
 RHO    = exp(-lambda * abs(tGrid' - tGrid));
 C      = chol(RHO, 'lower');
 
-%% 6. Monte Carlo pricing
+%% 5. Monte Carlo pricing
 Nsim    = 100000;
 payoffs = priceMC_ExoticCap(nu, B0_T, delta, L0, C, RHO, N, Nsim);
 
