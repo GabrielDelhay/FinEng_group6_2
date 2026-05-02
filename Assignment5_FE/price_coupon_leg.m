@@ -4,9 +4,9 @@ function NPV_B = price_coupon_leg(notional, schedule, market, bond)
 %    i = 2..i_3y      : Regime 1: L + 1.00% if L<=4.20% else 4.50%
 %                       = (L+1%) - (L-4.20%)+ - 0.70% * 1{L>4.20%}
 %    i_3y+1..i_6y     : Regime 2: L + 1.20% if L<=4.70% else 4.90%
-%                       = (L+1.20%) - (L-4.70%)+ - 0.70% * 1{L>4.70%}
+%                       = (L+1.20%) - (L-4.70%)+ - 1.00% * 1{L>4.70%}
 %    i_6y+1..i_10y    : Regime 3: L + 1.30% if L<=5.40% else 5.60%
-%                       = (L+1.30%) - (L-5.40%)+ - 0.90% * 1{L>5.40%}
+%                       = (L+1.30%) - (L-5.40%)+ - 1.10% * 1{L>5.40%}
 %
 %  INPUTS:
 %    notional  : N
