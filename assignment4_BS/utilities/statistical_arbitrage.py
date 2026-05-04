@@ -190,8 +190,6 @@ def estimate_ou_window_residuals(
     # Compute daily residuals
     daily_residuals = Y - X_aug @ B
 
-    prova = residuals_by_function - daily_residuals
-
     # Compute cumulative residuals
     residuals = np.cumsum(daily_residuals, axis=0)
     residuals_df = pd.DataFrame(
