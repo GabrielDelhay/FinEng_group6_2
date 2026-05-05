@@ -28,7 +28,7 @@ flat_vols = [
 
 flat_vols = flat_vols / 100;   % -> convert vols to decimals
 formatDate = 'dd/mm/yyyy';
-[datesSet, ratesSet] = readExcelData('MktData_CurveBootstrap.xls', formatDate);
+[datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
 [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
 t0 = dates(1);  % Settlement date: 19/02/2008
 
@@ -170,7 +170,7 @@ fprintf('\n=== Exercice 2 ===\n');
 %% 1. Market data
 N          = 16;
 resetDates = buildResetDates(t0, N);
-delta      = yearfrac(resetDates(1:end-1), resetDates(2:end), 3);
+delta      = yearfrac(resetDates(1:end-1), resetDates(2:end), 2); %act/360
 B0_T       = linearRateInterp(dates, discounts, t0, resetDates);
 L0         = (B0_T(1:end-1) ./ B0_T(2:end) - 1) ./ delta;
 
