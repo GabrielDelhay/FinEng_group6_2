@@ -25,8 +25,8 @@ from utilities.covariance_utilities import (
 def minimum_variance_portfolio(cov_matrix: np.ndarray) -> np.ndarray:
     """
     Calculate the minimum variance portfolio weights given a covariance matrix.
-    In particular the weights are given by:
-    w = (Σ^(-1) * 1) / (1^T * Σ^(-1) * 1), i.e. the solution of the optimization problem:
+    In particular the weights are given by: (pay attention: the following formula has to be written with the invese ov matrix)
+    w = (Σ * 1) / (1^T * Σ * 1), i.e. the solution of the optimization problem: 
     min_w w^T * Σ * w, subject to 1^T * w = 1.
 
     Parameters:
@@ -47,10 +47,12 @@ def minimum_variance_portfolio(cov_matrix: np.ndarray) -> np.ndarray:
     n = cov_matrix.shape[0]
     ones_vec = np.ones((n, 1))
 
-    min_var_ptf_numerator = None  # !!! COMPLETE AS APPROPRIATE !!!
-    min_var_ptf_weights = None  # !!! COMPLETE AS APPROPRIATE !!!
+    min_var_ptf_numerator = np.linalg.inv(cov_matrix) @ ones_vec
+    min_var_ptf_weights = min_var_ptf_numerator / (ones_vec.T @ np.linalg.inv(cov_matrix) @ ones_vec)
 
     return min_var_ptf_weights.flatten()
+
+
 
 
 def mean_variance_portfolio(
@@ -107,9 +109,18 @@ def mean_variance_portfolio(
         raise ValueError(
             f"risk_aversion must be strictly positive, got {risk_aversion}"
         )
+    n = cov_matrix.shape[0]
+    ones_vec = np.ones(n)
 
-    mean_var_ptf_weights = None  # !!! COMPLETE AS APPROPRIATE !!!
+    # Σ⁻¹μ e Σ⁻¹1
+    inv_cov_mu = np.linalg.solve(cov_matrix, expected_returns)
+    inv_cov_ones = np.linalg.solve(cov_matrix, ones_vec)
 
+    A = ones_vec @ inv_cov_mu      # 1ᵀ Σ⁻¹ μ
+    C = ones_vec @ inv_cov_ones    # 1ᵀ Σ⁻¹ 1
+
+    # a* = (A/γ) · (Σ⁻¹μ / A) + (1 - A/γ) · (Σ⁻¹1 / C)
+    mean_var_ptf_weights = (A / risk_aversion) * (inv_cov_mu / A) + (1 - A / risk_aversion) * (inv_cov_ones / C)
     return mean_var_ptf_weights.flatten()
 
 
@@ -129,8 +140,19 @@ def inverse_volatility_portfolio(covariance: np.ndarray) -> np.ndarray:
         np.ndarray: Inverse-volatility weights summing to 1.
     """
 
-    # !!! COMPLETE AS APPROPRIATE !!!
-    pass
+    cov_matrix = _validate_covariance_matrix(
+        covariance,
+        name="covariance",
+        require_positive_definite=False,
+        positive_definite_message=(
+            "covariance must be positive definite (symmetric with positive eigenvalues)"                    
+        ),
+    )
+    volatilities = np.sqrt(np.diag(cov_matrix))
+    inv_vol_weights = 1 / volatilities
+    inv_vol_weights /= inv_vol_weights.sum()
+    
+    return inv_vol_weights
 
 
 def erc_objective_function(weights: np.ndarray, covariance: np.ndarray) -> float:
@@ -153,6 +175,7 @@ def erc_objective_function(weights: np.ndarray, covariance: np.ndarray) -> float
     return len(non_normalized_risk_contributions) * np.sum(
         np.square(non_normalized_risk_contributions)
     ) - np.sum(non_normalized_risk_contributions @ non_normalized_risk_contributions.T)
+
 
 
 def equal_risk_contribution_portfolio(
@@ -178,5 +201,72 @@ def equal_risk_contribution_portfolio(
         np.ndarray: Equal risk contribution portfolio.
     """
 
-    # !!! COMPLETE AS APPROPRIATE !!!
-    pass
+    covariance = np.asarray(covariance, dtype=float)
+
+    if covariance.ndim != 2 or covariance.shape[0] != covariance.shape[1]:
+        raise ValueError("covariance must be square")
+
+    if not np.all(np.isfinite(covariance)):
+        raise ValueError("covariance contains NaN or Inf")
+
+    n = covariance.shape[0]
+
+    # Initial solution
+    if initial_solution is None:
+        vol = np.sqrt(np.diag(covariance))
+        if np.any(vol == 0):
+            raise ValueError("Zero volatility asset")
+        w0 = 1.0 / vol
+        w0 /= w0.sum()
+    else:
+        w0 = np.asarray(initial_solution, dtype=float).reshape(-1)
+
+        if w0.shape[0] != n:
+            raise ValueError("initial_solution size mismatch")
+
+        if not np.all(np.isfinite(w0)):
+            raise ValueError("initial_solution contains NaN/Inf")
+
+        w0 = w0 / np.sum(w0)
+
+    # Constraints
+    constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1}
+    bounds = [(0.0, 1.0)] * n
+
+    # Solver options
+    if options is None:
+        options = {"maxiter": 1000, "ftol": 1e-12, "disp": False}
+    elif not isinstance(options, dict):
+        raise ValueError("options must be a dictionary")
+
+    # Optimization 
+    result = minimize(
+        erc_objective_function,   
+        w0,
+        args=(covariance,),
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+        options=options,
+    )
+
+    if not result.success:
+        raise ValueError(f"ERC optimization failed: {result.message}")
+
+    w = result.x
+
+    # Check ERC condition
+    if not ignore_objective:
+        rc = risk_contribution(w, covariance)
+        rc = rc.reshape(-1)  # sécurité
+
+        pcr = rc / np.sum(rc)
+
+        if np.max(pcr) - np.min(pcr) > pcr_tolerance:
+            raise ValueError(
+                f"ERC condition not satisfied: "
+                f"max {np.max(pcr):.6f}, min {np.min(pcr):.6f}, "
+                f"tol {pcr_tolerance:.6f}"
+            )
+
+    return w

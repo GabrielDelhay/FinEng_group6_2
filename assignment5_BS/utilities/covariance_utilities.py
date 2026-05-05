@@ -136,5 +136,27 @@ def risk_contribution(portfolios: np.ndarray, cov: np.ndarray) -> np.ndarray:
         ValueError: If dimensions don't match or inputs contain NaN/Inf
     """
 
-    # !!! COMPLETE AS APPROPRIATE !!!
-    pass
+    portfolios = np.asarray(portfolios, dtype=float)
+    cov = np.asarray(cov, dtype=float)
+
+    if portfolios.ndim == 1:
+        # Single portfolio
+        port_var = portfolios @ cov @ portfolios
+        if port_var <= 0:
+            raise ValueError("Non-positive portfolio variance")
+
+        marginal = cov @ portfolios
+        return portfolios * marginal / port_var
+
+    elif portfolios.ndim == 2:
+        # Multiple portfolios
+        port_var = np.einsum('ij,jk,ik->i', portfolios, cov, portfolios)
+        if np.any(port_var <= 0):
+            raise ValueError("Non-positive portfolio variance detected")
+
+        marginal = portfolios @ cov.T  # (n_portfolios, n_assets)
+
+        return portfolios * marginal / port_var[:, None]
+
+    else:
+        raise ValueError("portfolios must be 1D or 2D array")

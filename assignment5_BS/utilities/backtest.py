@@ -25,7 +25,7 @@ def _align_portfolios_and_returns(
     aligned_portfolios = (
         portfolios.loc[:, overlapping_assets]
         .reindex(returns.index)
-        .bfill()
+        .ffill()
         .shift()
         .dropna(axis=0, how="all")
     )
@@ -65,7 +65,12 @@ def portfolio_returns(
     gross_returns = aligned_portfolios.multiply(aligned_returns).sum(axis=1)
 
     if transaction_costs != 0.0:
-        pass  # !!! COMPLETE AS APPROPRIATE !!!
+        # w(t-1) = 0 on day one: the portfolio opens from cash, so the full
+        # initial gross book is real turnover and must be charged.
+        prev_weights = aligned_portfolios.shift(1).fillna(0.0)
+        turnover = (aligned_portfolios - prev_weights).abs().sum(axis=1)
+        gross_returns -= turnover * transaction_costs
+
 
     return gross_returns
 
