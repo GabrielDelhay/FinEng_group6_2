@@ -25,8 +25,13 @@ def hierarchical_clustering(
             clusters Z[i, 0] and Z[i, 1] is given by Z[i, 2]. The fourth value Z[i, 3] represents
             the number of original observations in the newly formed cluster.
     """
-
-    linkage_matrix = None  # !!! COMPLETE AS APPROPRIATE !!!
+    linkage_matrix = sch.linkage(
+        scipy.spatial.distance.squareform(
+            matrix.values if isinstance(matrix, pd.DataFrame) else matrix
+        ),
+        method=linkage_method,
+        metric=distance_metric,
+    )
 
     if plot_dendrogram:
         plt.figure()
