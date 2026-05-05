@@ -24,7 +24,7 @@ def correlation_to_hrp_distance(correlation: np.ndarray) -> np.ndarray:
     """
 
     correlation = np.clip(correlation, -1.0, 1.0)
-    return np.sqrt(0.5 * (1.0 + correlation))   #MISTAKE: it was 2 instead of 0.5
+    return np.sqrt(0.5 * (1.0 - correlation))   #MISTAKE: it was 2 instead of 0.5 and there was a plus instead of a minus
 
 
 def flatten_list(lst: List[Any]) -> List[Any]:
@@ -148,7 +148,7 @@ def dendrogram_iteration(
     
     # Initialize leaves: each original asset maps to itself (or its label)
     for i in range(N):
-        cluster_map[i] = labels[i] if labels is not None else i
+        cluster_map[i] = [labels[i]] if labels is not None else [i]
     
     # Build internal nodes bottom-up following the linkage matrix.
     # Row i of the linkage matrix represents the (N+i)-th cluster,

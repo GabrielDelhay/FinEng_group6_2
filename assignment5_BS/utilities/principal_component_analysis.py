@@ -29,9 +29,23 @@ def detone(corr_matrix: np.ndarray, components_num: int = 1) -> np.ndarray:
         np.ndarray: Detoned correlation matrix.
     """
 
-    # !!! COMPLETE AS APPROPRIATE !!!
-    pass
+  # 1. PCA of the correlation matrix (eigenvalues sorted in decreasing order)
+    eigenvalues, eigenvectors = principal_component_analysis(corr_matrix)
 
+    # 2. Select the first `components_num` principal components
+    market_eigenvalues = eigenvalues[:components_num]
+    market_eigenvectors = eigenvectors[:, :components_num]
+
+    # 3. Reconstruct the rank-`components_num` component: U_m * Lambda_m * U_m^T
+    market_component = (
+        market_eigenvectors * market_eigenvalues
+    ) @ market_eigenvectors.T
+
+    # 4. Subtract the selected components from the correlation matrix
+    detoned = corr_matrix - market_component
+
+    # 5. Rescale to restore unit diagonal
+    return covariance_to_correlation(detoned)  
 
 def align_eigenvectors_to_previous(
     current_eig_vecs: pd.DataFrame,
