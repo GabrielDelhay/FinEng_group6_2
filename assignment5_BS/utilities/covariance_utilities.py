@@ -116,8 +116,28 @@ def covariance_to_correlation(
         ValueError: If any asset has zero or negative variance, or if matrix contains NaN/Inf
     """
 
-    # !!! COMPLETE AS APPROPRIATE !!!
-    pass
+    # Validate input (no PD check: detoned matrices are singular)
+    cov = _validate_covariance_matrix(
+        np.asarray(covariance, dtype=float),
+        name="covariance",
+        require_positive_definite=False,
+    )
+
+    # Variances on the diagonal
+    variances = np.diag(cov)
+    if np.any(variances <= 0):
+        raise ValueError("All diagonal elements (variances) must be strictly positive")
+
+    # Standard deviations
+    std_devs = np.sqrt(variances)
+
+    # rho_{i,j} = Sigma_{i,j} / (sigma_i * sigma_j) — vectorized D^-1 Sigma D^-1
+    correlation = cov / np.outer(std_devs, std_devs)
+
+    # Clean up floating-point noise on the diagonal
+    np.fill_diagonal(correlation, 1.0)
+
+    return correlation
 
 
 def risk_contribution(portfolios: np.ndarray, cov: np.ndarray) -> np.ndarray:

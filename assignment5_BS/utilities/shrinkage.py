@@ -137,11 +137,11 @@ def market_factor_shrinkage(
     combined = np.column_stack([returns_np, market_np])
     cov_matrix_full = np.cov(combined.T)
     cov_with_market = cov_matrix_full[:-1, -1]  # Covariances of each asset with market
-    betas = cov_with_market / market_variance  # !!! COMPLETE AS APPROPRIATE !!!
+    betas = cov_with_market / market_variance  
 
     # Calculate residual variances: Var(asset) - β² * Var(market) (vectorized)
-    asset_variances = np.diag(cov_matrix_full[:-1, :-1]) # !!! COMPLETE AS APPROPRIATE !!!
-    residual_variances = asset_variances - betas**2 * market_variance  # !!! COMPLETE AS APPROPRIATE !!!
+    asset_variances = np.diag(cov_matrix_full[:-1, :-1]) 
+    residual_variances = asset_variances - betas**2 * market_variance  
 
     # Ensure residual variances are positive (vectorized)
     residual_variances = np.maximum(residual_variances, 1e-8)

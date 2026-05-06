@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.cluster.hierarchy as sch
+from scipy.spatial.distance import squareform
 
 
 def hierarchical_clustering(
@@ -25,13 +26,8 @@ def hierarchical_clustering(
             clusters Z[i, 0] and Z[i, 1] is given by Z[i, 2]. The fourth value Z[i, 3] represents
             the number of original observations in the newly formed cluster.
     """
-    linkage_matrix = sch.linkage(
-        scipy.spatial.distance.squareform(
-            matrix.values if isinstance(matrix, pd.DataFrame) else matrix
-        ),
-        method=linkage_method,
-        metric=distance_metric,
-    )
+    data = matrix.values if isinstance(matrix, pd.DataFrame) else matrix
+    linkage_matrix = sch.linkage(data, method=linkage_method, metric=distance_metric)
 
     if plot_dendrogram:
         plt.figure()
