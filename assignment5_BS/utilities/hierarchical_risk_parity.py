@@ -138,6 +138,19 @@ def dendrogram_iteration(
     labels: List[Any] | None = None,
     clusters_num: int | None = None,
 ) -> List[Any]:
+    
+    """
+    Convert a linkage matrix to nested clusters according to the dendrogram structure.
+
+    Parameters:
+        linkage_matrix (pd.DataFrame): Linkage matrix.
+        labels (List[Any] | None): Labels, default to None.
+        clusters_num (int | None): Number of clusters to be formed, default to None, i.e. use the
+            whole linkage matrix.
+
+    Returns:
+        List[Any]: Nested clusters.
+    """
 
     N = len(linkage_matrix) + 1  # number of original assets
     
