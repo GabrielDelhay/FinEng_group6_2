@@ -27,8 +27,7 @@ def hierarchical_clustering(
             the number of original observations in the newly formed cluster.
     """
     data = matrix.values if isinstance(matrix, pd.DataFrame) else matrix
-    condensed_dist = squareform(data, checks=False)
-    linkage_matrix = sch.linkage(condensed_dist, method=linkage_method)
+    linkage_matrix = sch.linkage(data, method=linkage_method)
     if plot_dendrogram:
         plt.figure()
         sch.dendrogram(
