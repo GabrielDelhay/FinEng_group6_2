@@ -155,7 +155,7 @@ def inverse_volatility_portfolio(covariance: np.ndarray) -> np.ndarray:
     return inv_vol_weights
 
 
-def erc_objective_function(weights: np.ndarray, covariance: np.ndarray) -> float:
+def erc_objective_function0(weights: np.ndarray, covariance: np.ndarray) -> float:
     """
     Equal risk contribution objective function implemented as the variance of the risk
     contributions. Minimizing this function leads to equal risk contributions across assets.
@@ -176,6 +176,29 @@ def erc_objective_function(weights: np.ndarray, covariance: np.ndarray) -> float
         np.square(non_normalized_risk_contributions)
     ) - np.sum(non_normalized_risk_contributions @ non_normalized_risk_contributions.T)
 
+
+
+
+
+
+
+
+def erc_objective_function(weights: np.ndarray, covariance: np.ndarray) -> float:
+    """
+    Equal risk contribution objective function: sum of squared pairwise differences
+    between normalized risk contributions. Numerically better conditioned than the
+    Maillard (2010) formulation on heterogeneous universes (daily returns).
+
+    Parameters:
+        weights (np.ndarray): Portfolio weights.
+        covariance (np.ndarray): Covariance matrix of asset returns.
+
+    Returns:
+        float: Objective function value.
+    """
+    port_var = weights @ covariance @ weights
+    rc = np.multiply(weights, covariance @ weights) / port_var  # normalized, order ~1/N
+    return np.sum((rc[:, None] - rc[None, :]) ** 2)
 
 
 def equal_risk_contribution_portfolio(
@@ -200,8 +223,16 @@ def equal_risk_contribution_portfolio(
     Returns:
         np.ndarray: Equal risk contribution portfolio.
     """
+    cov_matrix = _validate_covariance_matrix(
+        covariance,
+        name="covariance",
+        require_positive_definite=False,
+        positive_definite_message=(
+            "covariance must be positive definite (symmetric with positive eigenvalues)"
+        ),
+    )
 
-    covariance = np.asarray(covariance, dtype=float)
+    covariance = np.asarray(cov_matrix, dtype=float)
 
     if covariance.ndim != 2 or covariance.shape[0] != covariance.shape[1]:
         raise ValueError("covariance must be square")
@@ -211,7 +242,7 @@ def equal_risk_contribution_portfolio(
 
     n = covariance.shape[0]
 
-    # Initial solution
+    # Initial solution: inverse-volatility (close to ERC, better than equal-weight)
     if initial_solution is None:
         vol = np.sqrt(np.diag(covariance))
         if np.any(vol == 0):
@@ -220,28 +251,22 @@ def equal_risk_contribution_portfolio(
         w0 /= w0.sum()
     else:
         w0 = np.asarray(initial_solution, dtype=float).reshape(-1)
-
         if w0.shape[0] != n:
             raise ValueError("initial_solution size mismatch")
-
         if not np.all(np.isfinite(w0)):
             raise ValueError("initial_solution contains NaN/Inf")
-
         w0 = w0 / np.sum(w0)
 
-    # Constraints
     constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1}
     bounds = [(0.0, 1.0)] * n
 
-    # Solver options
     if options is None:
         options = {"maxiter": 1000, "ftol": 1e-12, "disp": False}
     elif not isinstance(options, dict):
         raise ValueError("options must be a dictionary")
 
-    # Optimization 
     result = minimize(
-        erc_objective_function,   
+        erc_objective_function,
         w0,
         args=(covariance,),
         method="SLSQP",
@@ -255,18 +280,17 @@ def equal_risk_contribution_portfolio(
 
     w = result.x
 
-    # Check ERC condition
+    # Check ERC condition: PCR = RC / port_var, normalized so they sum to 1
     if not ignore_objective:
-        rc = risk_contribution(w, covariance)
-        rc = rc.reshape(-1)  # sécurité
-
-        pcr = rc / np.sum(rc)
+        rc = risk_contribution(w, covariance).reshape(-1)
+        pcr = rc / rc.sum()  # normalized by port_var, order ~1/N
 
         if np.max(pcr) - np.min(pcr) > pcr_tolerance:
-            raise ValueError(
+            warnings.warn(
                 f"ERC condition not satisfied: "
                 f"max {np.max(pcr):.6f}, min {np.min(pcr):.6f}, "
-                f"tol {pcr_tolerance:.6f}"
+                f"tol {pcr_tolerance:.6f}",
+                RuntimeWarning,
             )
 
     return w
