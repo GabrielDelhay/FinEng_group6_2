@@ -118,11 +118,12 @@ NPV_coupons = N_cert * (c1 * B1 * p1 + c2 * B2 * (1 - p1));
 % Year 1 always paid; year 2 only if no ER (prob 1-p1)
 NPV_float = NPV_float_y1 + (1 - p1) * NPV_float_y2;
 
-% Upfront X% (mid-market: NPV_swap = 0 for Party B)
+% --- Upfront X% (mid-market: NPV_swap = 0 for Party B) ---
 % Party B: pays X*N + equity coupons, receives Euribor+spread
 % => X*N = NPV_float - NPV_coupons
 X_upfront = (NPV_float - NPV_coupons) / N_cert;
 
+fprintf('\n=== Exercise 1a: NIG Certificate Pricing ===\n');
 fprintf('S0 = %.2f  |  F1 = %.2f  |  K = %.0f\n', S0, F1, K_str);
 fprintf('x_K = log(K/F1) = %.6f\n', x_K);
 fprintf('p1 = Q(STOXX50 < 3200) = %.4f%%\n', p1 * 100);
