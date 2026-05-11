@@ -107,7 +107,7 @@ x_K  = log(K_str / F1);
 % Gil-Pelaez CDF inversion:  Q(f < x_K) = 1/2 + 1/pi * int_0^inf Im[e^{-iux} phi(u)] / u du
 phi_T1       = @(u) char_fun(u, p_opt, alpha_calib, tau1);
 gp_integrand = @(u) imag(exp(-1i * u * x_K) .* phi_T1(u)) ./ u;
-p1 = 0.5 + (1/pi) * integral(gp_integrand, 1e-8, 500, 'AbsTol', 1e-10, 'RelTol', 1e-8);
+p1 = 0.5 - (1/pi) * integral(gp_integrand, 1e-8, 500, 'AbsTol', 1e-10, 'RelTol', 1e-8);
 
 % NPV of equity coupons (Party B pays annually)
 % At T1: 6%*N if STOXX < K  (early redemption case)
@@ -131,3 +131,25 @@ fprintf('NPV float (with ER)  = %14.2f EUR\n', NPV_float);
 fprintf('NPV equity coupons   = %14.2f EUR\n', NPV_coupons);
 fprintf('Upfront X            =     %.4f%%\n', X_upfront * 100);
 fprintf('Upfront X * N        = %14.2f EUR\n', X_upfront * N_cert);
+
+% question b) Black model 
+% Implied vol at K = 3200 (interpolate on the market smile)
+sigma_black = interp1(strikes, smiles_mkt, K_str, 'spline');
+
+% Black digital put: Q(S(T1) < K) = N(-d2)
+d2_black = (log(F1 / K_str) - 0.5 * sigma_black^2 * tau1) / (sigma_black * sqrt(tau1));
+p1_black = normcdf(-d2_black);
+
+% Same NPV structure, just replace p1 with p1_black
+NPV_coupons_black = N_cert * (c1 * B1 * p1_black + c2 * B2 * (1 - p1_black));
+NPV_float_black   = NPV_float_y1 + (1 - p1_black) * NPV_float_y2;
+X_upfront_black   = (NPV_float_black - NPV_coupons_black) / N_cert;
+
+fprintf('sigma_black (at K=3200) = %.4f%%\n', sigma_black * 100);
+fprintf('p1_black = Q(STOXX50 < 3200) = %.4f%%\n', p1_black * 100);
+fprintf('Upfront X (Black)       =     %.4f%%\n', X_upfront_black * 100);
+fprintf('Delta NIG vs Black      =     %.4f bp\n', (X_upfront - X_upfront_black) * 1e4);
+
+% Calculate the difference in upfront costs between NIG and Black models
+delta_upfront = (X_upfront - X_upfront_black) * 1e4;  % in basis points
+fprintf('Delta Upfront (NIG - Black) = %.4f bp\n', delta_upfront);
