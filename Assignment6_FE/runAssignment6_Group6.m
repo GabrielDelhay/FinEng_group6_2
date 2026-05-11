@@ -3,33 +3,6 @@
 %
 clc; close all; clear all;
 
-% Set strikes
-strikes = [1.50, 1.75, 2.00, 2.25, 2.50, 3.00, 3.50, 4.00, 5.00, 6.00, 7.00, 8.00, 10.00];
-
-% Set maturities (years)
-maturities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20];
-n_strikes   = length(strikes);
-n_maturities = length(maturities);
-bp = 0.0001;
-
-% Init volatility matrix
-flat_vols = [
-    14.0, 13.0, 12.9, 12.1, 13.3, 13.8, 14.4, 15.0, 17.2, 19.1, 20.2, 21.6, 23.9;
-    22.4, 19.7, 17.5, 18.0, 19.2, 20.4, 21.0, 21.4, 22.3, 23.6, 24.9, 26.1, 28.1;
-    23.8, 21.7, 20.0, 19.8, 20.3, 20.5, 20.8, 21.4, 22.9, 24.3, 25.6, 26.7, 28.2;
-    24.2, 22.4, 20.9, 20.4, 20.4, 20.2, 20.2, 20.5, 21.7, 22.9, 24.0, 25.0, 26.6;
-    24.3, 22.6, 21.2, 20.6, 20.4, 19.8, 19.5, 19.6, 20.5, 21.5, 22.6, 23.5, 25.0;
-    24.3, 22.7, 21.4, 20.7, 20.2, 19.4, 18.9, 18.8, 19.3, 20.2, 21.2, 22.0, 23.5;
-    24.1, 22.6, 21.4, 20.7, 20.1, 19.1, 18.4, 18.1, 18.4, 19.1, 20.0, 20.8, 22.2;
-    23.9, 22.5, 21.4, 20.6, 20.0, 18.8, 18.0, 17.6, 17.6, 18.2, 19.0, 19.8, 21.1;
-    23.7, 22.4, 21.3, 20.5, 19.8, 18.5, 17.6, 17.1, 17.0, 17.6, 18.3, 19.0, 20.3;
-    23.5, 22.2, 21.2, 20.4, 19.6, 18.3, 17.3, 16.8, 16.5, 16.9, 17.6, 18.3, 19.5;
-    23.0, 21.7, 20.8, 20.0, 19.3, 17.9, 16.9, 16.2, 15.8, 16.0, 16.5, 17.1, 18.1;
-    22.3, 21.2, 20.3, 19.5, 18.7, 17.3, 16.3, 15.5, 15.0, 15.1, 15.5, 16.0, 16.9;
-    21.6, 20.4, 19.5, 18.8, 18.0, 16.6, 15.5, 14.7, 14.1, 14.1, 14.5, 15.0, 15.9
-];
-
-flat_vols = flat_vols / 100;   % -> convert vols to decimals
 formatDate = 'dd/mm/yyyy';
 [datesSet, ratesSet] = readExcelDataOS('MktData_CurveBootstrap.xls', formatDate);
 [dates, discounts, zeroRates] = bootstrap(datesSet, ratesSet);
@@ -38,24 +11,40 @@ t0 = dates(1);  % Settlement date: 19/02/2008
 
 %% EXERCISE 1
 
-% Load and bootstrap the zero rate curve
-[spot_vols, cap_dates, B_cap, fwd_rates, delta_fwd, tau_expiry, T_reset, cap_maturity_idx] = ...
-    lmm_spot_vols(flat_vols, strikes, maturities, dates, discounts, t0);
-%% Display results
-%  Print the spot vols at cap maturity dates so the output sits on the
-%  same grid as the input flat vols for direct comparison.
-fprintf('\n=== LMM Spot Vols (at cap maturity dates) [%%] ===\n');
-fprintf('Maturity |');
-for k = 1:n_strikes
-    fprintf(' K=%.2f%%', strikes(k));
-end
-fprintf('\n');
+%% Ex 5 - Global Calibration of nMV model
+load('eurostoxx_Poli.mat');
+strikes = double(cSelect.strikes); 
+T = double(cSelect.maturity);
+S0 = double(cSelect.reference); 
+divYield = double(cSelect.dividends);
+smiles_mkt = double(cSelect.surface);
+maturityDate = datenum('15/02/2008', formatDate) + 365;
+r = interp1(dates, zeroRates, maturityDate, "linear", "extrap");
+B = exp(-r * T);
+F0 = S0 * exp((r - divYield) * T);
+Notional = 10e6;
 
-for j = 1:n_maturities
-    fprintf('  %3dy   |', maturities(j));
-    i_beta = cap_maturity_idx(j);
-    for k = 1:n_strikes
-        fprintf('  %6.2f ', spot_vols(i_beta, k) * 100);
-    end
-    fprintf('\n');
+% Convert market IVs to Call prices for calibration objective
+alpha_calib = 2/3;
+C_mkt = BS_call(F0, strikes, B, smiles_mkt, T);
+
+% Optimization setup: initial guess, bounds, and nonlinear constraints
+params0 = [0.20, 2.0, 4.0];
+lb = [1e-4, 1e-4, -50.0]; ub = [2.00, 10.0, 50.0];
+nonlcon = @(p) deal(-p(3) - (1-alpha_calib)/(p(2)*p(1)^2), []);
+obj = @(p) sum((nMV_call_FFT(p, alpha_calib, F0, strikes, B, T) - C_mkt).^2);
+
+% Run fmincon to minimize price errors
+options = optimoptions('fmincon', 'Display', 'iter','MaxIterations', 5000, 'OptimalityTolerance', 1e-10, 'StepTolerance', 1e-10);
+[p_opt, fval] = fmincon(obj, params0, [], [], [], [], lb, ub, nonlcon, options);
+fprintf('\n--- Calibrated Params (alpha=2/3) ---\n  sigma = %.6f\n  kappa = %.6f\n  eta   = %.6f\n  Obj: %.6e\n', p_opt(1), p_opt(2), p_opt(3), fval);
+
+% Compute model IVs from calibrated prices and evaluate RMSE
+C_model = nMV_call_FFT(p_opt, alpha_calib, F0, strikes, B, T);
+IV_model = zeros(size(strikes));
+for i = 1:length(strikes)
+    IV_model(i) = blkimpv(F0, strikes(i), r, T, C_model(i));
 end
+RMSE = sqrt(mean((IV_model - smiles_mkt).^2)) * 100;
+fprintf('RMSE = %.4f%%\n', RMSE);
+fig2 = plot_calibration(F0, strikes, smiles_mkt, IV_model, RMSE);
