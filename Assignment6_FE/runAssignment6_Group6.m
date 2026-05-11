@@ -58,12 +58,6 @@ discounts_float = exp(-z_interp .* t_discount);
 PV_floating_leg = price_floating_leg(structData.notional, discounts_float, delta_pay, structData.spread);
 fprintf('Value of Floating Leg (via function): %.2f EUR\n', PV_floating_leg);
 
-%% --- FIXED/CONDITIONAL LEG CALCULATION (NIG MODEL) ---
-
-% 1. Get NIG parameters from Calibration (Exercise 1)
-alpha = params_opt(1);
-beta  = params_opt(2);
-delta = params_opt(3);
 
 %% --- FIXED/CONDITIONAL LEG CALCULATION (NIG MODEL) ---
 
@@ -104,13 +98,13 @@ integrand = @(u, T, r) real(exp(-1i*u*log(K)) .* phi_NIG(u, T, r) ./ (1i*u));
 prob_S1_low = 0.5 - (1/pi) * integral(@(u) integrand(u, T1_year, r1_eff), 0, inf);
 
 % 4. NPV and Early Redemption logic
-% Year 1: 6% if Stoxx < Strike. Hits 6% trigger -> Early Redemption [cite: 57, 58]
+% Year 1: 6% if Stoxx < Strike. Hits 6% trigger -> Early Redemption 
 PV_coupon1 = structData.couponYear1_Low * structData.notional * prob_S1_low * D1;
 
-% Survival: Swap continues only if Year 1 coupon was 0% (Stoxx >= Strike) [cite: 67]
+% Survival: Swap continues only if Year 1 coupon was 0% (Stoxx >= Strike)
 prob_survival = 1 - prob_S1_low; 
 
-% Year 2: Fixed 2% paid only if swap survived T1 [cite: 44, 67]
+% Year 2: Fixed 2% paid only if swap survived T1 
 PV_coupon2 = structData.couponLastYear * structData.notional * prob_survival * D2;
 
 % Total Conditional Leg Value
