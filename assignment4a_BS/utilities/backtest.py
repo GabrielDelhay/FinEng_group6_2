@@ -67,7 +67,7 @@ def portfolio_returns(
     if transaction_costs != 0.0:
         # w(t-1) = 0 on day one: the portfolio opens from cash, so the full
         # initial gross book is real turnover and must be charged.
-        prev_weights = aligned_portfolios.shift(1).fillna(0.0)
+        prev_weights = aligned_portfolios.shift(2).fillna(0.0)
         turnover = (aligned_portfolios - prev_weights).abs().sum(axis=1)
         gross_returns -= turnover * transaction_costs
 
