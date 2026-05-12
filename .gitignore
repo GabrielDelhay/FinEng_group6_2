@@ -1,3 +1,14 @@
+# MATLAB autosave
+*.asv
+
+# MATLAB project metadata
+Assignment6_FE/resources/project/
+
+# MATLAB project files
+*.prj
+toolbox.ignore
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
