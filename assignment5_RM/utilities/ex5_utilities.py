@@ -42,12 +42,10 @@ def simulate_ou_process(
         Simulated paths of x_t, shape (n_sim, n_dates)
     """
 
-    # !!! COMPLETE AS APPROPRIATE !!! 
+    n_steps = len(simulation_grid)
     
-    n_steps = None
-
     # Generate standard normal variables
-    Z = None
+    Z = np.random.standard_normal((n_sim, n_steps))
 
     # Allocate paths
     x_paths = np.zeros((n_sim, n_steps))
@@ -56,10 +54,13 @@ def simulate_ou_process(
     # Time stepping
     for i, sim_date in enumerate(simulation_grid):
 
-        prev_date = None
+        prev_date = today if i == 0 else simulation_grid[i - 1]
         dt = year_frac_act_x(prev_date, sim_date, 360)
 
-        x_current = None
+        mean  = x_prev * np.exp(-mean_reversion * dt)
+        var   = (sigma**2 / (2 * mean_reversion)) * (1 - np.exp(-2 * mean_reversion * dt))
+
+        x_current = mean + np.sqrt(var) * Z[:, i]
 
         x_paths[:, i] = x_current
         x_prev = x_current
@@ -98,10 +99,11 @@ def affine_trick(
 
     # Ensure discount factors exist on the whole pricing grid
     missing_dates = [d for d in pricing_grid if d not in discount_factors.index]
-  
-    # !!! COMPLETE AS APPROPRIATE !!! 
+
     if missing_dates:
-        interpolated_dfs = None
+        interpolated_dfs = get_discount_factor_by_zero_rates_linear_interp(
+            discount_factors, missing_dates
+        )
         
         discount_factors = (
             pd.concat([discount_factors, interpolated_dfs])
@@ -109,7 +111,7 @@ def affine_trick(
         )
 
     # Volatility integrand
-    sigma_func = lambda u: None
+    sigma_func = lambda u,   T_yf: (sigma / mean_reversion) * (1 - np.exp(-mean_reversion * (T_yf - u)))    #MISTAKE? there was only one argument
 
     # Compute A(t,T) and C(t,T)
     for T in pricing_grid:
@@ -119,12 +121,14 @@ def affine_trick(
             C[T] = 0
             continue
 
-        tau_t_T = None
-        tau_0_T = None
-        tau_0_t = None
+        tau_t_T = year_frac_act_x(valuation_date, T, 360)
+        tau_0_T = year_frac_act_x(reference_date, T, 360)
+        tau_0_t = year_frac_act_x(reference_date, valuation_date, 360)
 
-        A[T] = None
-        C[T] = None
+        # integral of sigma(u,T)^2 - sigma(u,t)^2 from 0 to tau_0_t
+        integral, _ = quad(lambda u: sigma_func(u, tau_0_T)**2 - sigma_func(u, tau_0_t)**2, 0, tau_0_t)
+        A[T] = (discount_factors.loc[T] / discount_factors.loc[valuation_date]) * np.exp(-0.5 * integral)
+        C[T] = (1 - np.exp(mean_reversion * tau_t_T)) / mean_reversion
 
     return A, C
 
@@ -198,25 +202,32 @@ def update_collateral(
     Margin calls are applied only when the required change exceeds
     the relevant MTA.
     """
-
-    # Compute target VM* (before any constrain)
-
-    VM_star = None
     
-    # Theoretical margin call
+    # Compute target VM* (before any constraint)
+    # VM* = max(MtM - THR_C, 0) if MtM >= 0
+    #       min(MtM + THR_B, 0) if MtM < 0
+    VM_star = np.where(mtm >= 0,
+                       np.maximum(mtm - THR_C, 0),
+                       np.minimum(mtm + THR_B, 0))
 
-    delta_VM = None
+    # Theoretical margin call
+    delta_VM = VM_star - VM
 
     # Effective margin call (compare with MTA)
-    
-    margin_call = None
-    
+    # delta_VM > 0: C must post -> compare with MTA_C
+    # delta_VM < 0: B must post -> compare with MTA_B
+    margin_call = np.where(delta_VM >= 0,
+                           np.where(delta_VM >= MTA_C, delta_VM, 0),
+                           np.where(np.abs(delta_VM) >= MTA_B, delta_VM, 0))
+
     # Update VM before caps
+    VM_no_cap = VM + margin_call
 
-    VM_no_cap = None
-    
     # Apply collateral caps
-
-    VM_updated = None
+    # VM > 0: C has posted collateral -> cap at Cap_C
+    # VM < 0: B has posted collateral -> cap at Cap_B (in absolute value)
+    VM_updated = np.where(VM_no_cap >= 0,
+                          np.minimum(VM_no_cap, Cap_C),
+                          np.maximum(VM_no_cap, -Cap_B))
 
     return VM_updated
