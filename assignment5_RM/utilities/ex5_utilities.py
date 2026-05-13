@@ -5,7 +5,7 @@ import datetime as dt
 from typing import Tuple, List
 from scipy.integrate import quad    # compute numerical integration
 
-from utilities.ex1_utilities import (
+from utilities.ex0_utilities import (                         # MISTAKE: it was imported from the wrong utilities 
     get_discount_factor_by_zero_rates_linear_interp,
     year_frac_act_x,
 )
@@ -98,20 +98,29 @@ def affine_trick(
     C = pd.Series(index=pricing_grid, dtype=float)
 
     # Ensure discount factors exist on the whole pricing grid
-    missing_dates = [d for d in pricing_grid if d not in discount_factors.index]
+    missing_dates = [d for d in list(pricing_grid) + [valuation_date] 
+                 if d not in discount_factors.index]                   #MISTAKE: added the case of valuation date not on the grid
 
     if missing_dates:
-        interpolated_dfs = get_discount_factor_by_zero_rates_linear_interp(
-            discount_factors, missing_dates
-        )
-        
+        interp_vals = [
+            get_discount_factor_by_zero_rates_linear_interp(
+                reference_date,
+                d,    
+                discount_factors.index,
+                discount_factors.values
+                ) for d in missing_dates
+            ]
+
+
+        interpolated_dfs = pd.Series(index=missing_dates, data=interp_vals)
+
         discount_factors = (
             pd.concat([discount_factors, interpolated_dfs])
             .sort_index()
         )
 
     # Volatility integrand
-    sigma_func = lambda u,   T_yf: (sigma / mean_reversion) * (1 - np.exp(-mean_reversion * (T_yf - u)))    #MISTAKE? there was only one argument
+    sigma_func = lambda u, T: (sigma / mean_reversion) * (1 - np.exp(-mean_reversion * (T - u)))    #MISTAKE? there was only one argument
 
     # Compute A(t,T) and C(t,T)
     for T in pricing_grid:
@@ -128,7 +137,7 @@ def affine_trick(
         # integral of sigma(u,T)^2 - sigma(u,t)^2 from 0 to tau_0_t
         integral, _ = quad(lambda u: sigma_func(u, tau_0_T)**2 - sigma_func(u, tau_0_t)**2, 0, tau_0_t)
         A[T] = (discount_factors.loc[T] / discount_factors.loc[valuation_date]) * np.exp(-0.5 * integral)
-        C[T] = (1 - np.exp(mean_reversion * tau_t_T)) / mean_reversion
+        C[T] = (1 - np.exp(-mean_reversion * tau_t_T)) / mean_reversion
 
     return A, C
 
