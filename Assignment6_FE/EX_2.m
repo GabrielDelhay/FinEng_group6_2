@@ -65,14 +65,14 @@ exec = cal.anchor.dates(2:end);                      % T_2..T_10
 upperBound = getUpperSwaption(dates, discounts, t0, exec, K, a, sigma);
 fprintf('Upper bound (cap)             : %.6f\n', upperBound);
 
-callDates    = cal.anchor.dates(2:end-1);            % T_2..T_9 (esercitabili)
+callDates    = cal.anchor.dates(2:end-1);            % T_2..T_9
 paymentDates = cal.anchor.dates;                     % T_1..T_10
 
 lowerBound = getLowerSwaption(dates, discounts, t0, ...
     callDates, paymentDates, K, a, sigma);
 fprintf('Lower bound (max Eur Jamsh.)  : %.6f\n', lowerBound);
 
-%% Riassunto
+%% Recap
 fprintf('\n=== Summary ===\n');
 fprintf('Lower    : %.6f\n', lowerBound);
 fprintf('Bermudan : %.6f\n', priceSwaption);
