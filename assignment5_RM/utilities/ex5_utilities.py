@@ -98,9 +98,8 @@ def affine_trick(
     C = pd.Series(index=pricing_grid, dtype=float)
 
     # Ensure discount factors exist on the whole pricing grid
-    missing_dates = [d for d in list(pricing_grid) + [valuation_date] 
-                 if d not in discount_factors.index]                   #MISTAKE: added the case of valuation date not on the grid
-
+    needed_dates = pd.DatetimeIndex(list(pricing_grid) + [valuation_date]).unique()
+    missing_dates = [d for d in needed_dates if d not in discount_factors.index]
     if missing_dates:
         interp_vals = [
             get_discount_factor_by_zero_rates_linear_interp(
