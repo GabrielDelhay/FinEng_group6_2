@@ -47,7 +47,8 @@ x_K  = log(K_str / F1);
 
 % Risk-neutral probability and upfront — NIG
 p1        = digital_put_NIG(p_opt, alpha_calib, x_K, tau1);
-[X_NIG]   = price_certificate(p1, N_cert, c1, c2, B1, B2, BPV_y1, BPV_y2, spread);
+% upfront
+X_NIG     = price_certificate(p1, N_cert, c1, c2, B1, B2, BPV_y1, BPV_y2, spread);
 
 fprintf('Upfront NIG   = %.4f%%\n', X_NIG   * 100);
 
@@ -101,12 +102,9 @@ p1_mc     = mean(ER_T1);
 p_joint   = mean(ER_T2);
 p_survive = mean(survive);
 
-% NPV (same structure as 2y, extended to 3y)
-NPV_float3   = N_cert*(1-B1) + spread*N_cert*BPV_y1 ...
-             + (1-p1_mc) * (N_cert*(B1-B2) + spread*N_cert*BPV_y2) ...
-             + p_survive * (N_cert*(B2-B3) + spread*N_cert*BPV_y3);
-NPV_coupons3 = N_cert * (c1*B1*p1_mc + c1*B2*p_joint + c2*B3*p_survive);
-X_NIG3       = (NPV_float3 - NPV_coupons3) / N_cert;
+% upfront
+X_NIG3 = price_certificate3y(p1_mc, p_joint, p_survive, N_cert, c1, c2, ...
+                              B1, B2, B3, BPV_y1, BPV_y2, BPV_y3, spread);
 
 fprintf('p1  (ER at T1)       = %.4f%%\n', p1_mc*100);
 fprintf('p12 (ER at T2)       = %.4f%%\n', p_joint*100);
@@ -114,5 +112,5 @@ fprintf('p3  (reach T3)       = %.4f%%\n', p_survive*100);
 fprintf('Upfront X (3y NIG)   = %.4f%%\n', X_NIG3*100);
 
 
-%% question e) error using Black model 
+
 

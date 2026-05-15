@@ -1,14 +1,17 @@
 function C = nMV_call_FFT(p, alpha, F0, K_vec, B, T)
-    % Lewis via FFT
-    %
-    % Integral:  I(x) = int_{-inf}^{+inf} dxi/(2pi) * e^{-i*xi*x}
-    %                   * phi(-xi-i/2) / (xi^2 + 1/4)
-    %
-    % Discretization:
-    %   xi_j = xi_1 + (j-1)*dxi,   j = 1,...,N
-    %   x_k  = x_1  + (k-1)*dx
-    %   dxi * dx = 2*pi/N
-    
+% Lewis via FFT
+% INPUTS:
+    % p      : NIG parameters [theta, kappa, sigma] (calibrated by fmincon)
+    % alpha  : mixing exponent = 0.5 (NIG)
+    % F0     : forward price F(t0, T)
+    % K_vec  : vector of strikes at which to price
+    % B      : discount factor B(t0, T)
+    % T      : time to maturity in years
+%
+% OUTPUT:
+    % C      : vector of call prices at each strike in K_vec, via Lewis (2001)
+    %          FFT discretization of the integral I(x) = int e^{-i*xi*x} *
+    %          phi(-xi-i/2) / (xi^2 + 1/4) dxi/(2pi)
     M   = 14;
     N   = 2^M;
     dxi = 0.01;         % frequency step
@@ -56,7 +59,7 @@ function C = nMV_call_FFT(p, alpha, F0, K_vec, B, T)
     
     % Check all requested moneyness values fall inside the grid
     if any(x_req < x_k(1)) || any(x_req > x_k(end))
-        warning('Some strikes fall outside FFT moneyness grid! Increase M or adjust dxi.');
+        warning('Some strikes fall outside FFT moneyness grid. Increase M or adjust dxi.');
     end
     
     C = interp1(x_k, C_grid, x_req, 'spline');
