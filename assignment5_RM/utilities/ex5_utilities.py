@@ -247,7 +247,7 @@ def update_collateral(
 
 
 
-def compute_epe_base(discount_factors_input, sigma_input, simulation_grid, x_paths, fixed_leg_payment_dates, notional, mean_reversion):
+def compute_epe_base(discount_factors_input, sigma_input, simulation_grid, x_paths, fixed_leg_payment_dates, notional, mean_reversion, swap_rate_fixed):
     """
     Recompute the EPE profile for the base (10y payer) swap only,
     given a (possibly bumped) discount-factor curve and/or sigma.
@@ -257,7 +257,7 @@ def compute_epe_base(discount_factors_input, sigma_input, simulation_grid, x_pat
     epe = np.zeros(len(simulation_grid))
 
     # Recompute fixed-leg cash flows on the (possibly bumped) curve
-    swap_rate_bumped = swap_par_rate(fixed_leg_payment_dates, discount_factors_input)
+    swap_rate_bumped = swap_rate_bumped = swap_rate_fixed  # fixed contractually, does not change with the curve
     cf_bumped = pd.Series(
         data=[
             swap_rate_bumped * year_frac_30e_360(
